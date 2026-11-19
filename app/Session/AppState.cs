@@ -8,7 +8,7 @@ internal sealed class AppState
     public TrayHost? Tray { get; set; }
     public CaptureCoordinator Coordinator { get; set; } = null!;
 
-    public void SaveSettings()
+    public IReadOnlyList<string> SaveSettings()
     {
         SettingsStore.Save(Settings);
         try
@@ -19,6 +19,6 @@ internal sealed class AppState
         {
             Tray?.Balloon(Brand.Name, ex.Message);
         }
-        Hotkeys.RegisterAll();
+        return Hotkeys.RegisterAll();
     }
 }

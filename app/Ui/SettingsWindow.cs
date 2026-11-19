@@ -165,9 +165,15 @@ internal sealed class SettingsWindow : Window
         }
         _state.Settings.SetGesture(action, gesture);
         _labels[action].Text = gesture.Display;
+        var failed = _state.SaveSettings();
+        if (failed.Count > 0)
+        {
+            _note.Foreground = Palette.Danger;
+            _note.Text = "Couldn't register " + string.Join(", ", failed) + ". Another app may already own that key.";
+            return;
+        }
         _note.Foreground = Palette.Muted;
         _note.Text = "Shortcut saved.";
-        _state.SaveSettings();
     }
 
     private void StopListening()

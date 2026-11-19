@@ -10,7 +10,7 @@ internal sealed class HotkeyHost : IDisposable
 
     public HotkeyHost(AppState state) => _state = state;
 
-    public void RegisterAll()
+    public IReadOnlyList<string> RegisterAll()
     {
         EnsureWindow();
         Unregister();
@@ -27,7 +27,11 @@ internal sealed class HotkeyHost : IDisposable
                 continue;
             }
             int id = (int)action + 1;
-            if (!NativeMethods.RegisterHotKey(hwnd, id, gesture.NativeModifiers, (uint)gesture.VirtualKey))
+            uint modifiers = gesture.NativeModifiers;
+            bool registered = NativeMethods.RegisterHotKey(hwnd, id, modifiers, (uint)gesture.VirtualKey);
+            if (!registered && (modifiers & 0x4000) != 0)
+                registered = NativeMethods.RegisterHotKey(hwnd, id, modifiers & ~0x4000u, (uint)gesture.VirtualKey);
+            if (!registered)
             {
                 failed.Add($"{Label(action)} ({gesture.Display})");
                 continue;
@@ -36,12 +40,7 @@ internal sealed class HotkeyHost : IDisposable
             seen.Add(gesture);
         }
 
-        if (failed.Count > 0)
-        {
-            _state.Tray?.Balloon(
-                Brand.Name,
-                "Couldn't register: " + string.Join(", ", failed) + ". Another app may already own that key.");
-        }
+        return failed;
     }
 
     public void Unregister()

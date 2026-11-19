@@ -13,8 +13,18 @@ internal static class ShotMenu
             surface.CommitEditing();
             session.Save(owner);
         }));
+        IDisposable? pause = null;
+        menu.Opened += (_, _) =>
+        {
+            pause?.Dispose();
+            pause = ClickAway.Pause(owner);
+        };
+        menu.Closed += (_, _) =>
+        {
+            pause?.Dispose();
+            pause = null;
+        };
         host.ContextMenu = menu;
-        host.ContextMenuOpening += (_, _) => Copy(surface, session);
     }
 
     private static void Copy(ShotSurface surface, EditorSession session)
