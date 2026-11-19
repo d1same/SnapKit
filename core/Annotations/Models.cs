@@ -33,6 +33,19 @@ public readonly record struct IntRect(int X, int Y, int Width, int Height)
     }
 
     public bool Contains(double x, double y) => x >= X && y >= Y && x < Right && y < Bottom;
+
+    public IntRect Clamp(int boundsWidth, int boundsHeight, int minSize)
+    {
+        int limitW = Math.Max(1, boundsWidth);
+        int limitH = Math.Max(1, boundsHeight);
+        int minW = Math.Min(Math.Max(1, minSize), limitW);
+        int minH = Math.Min(Math.Max(1, minSize), limitH);
+        int width = Math.Clamp(Width, minW, limitW);
+        int height = Math.Clamp(Height, minH, limitH);
+        int x = Math.Clamp(X, 0, limitW - width);
+        int y = Math.Clamp(Y, 0, limitH - height);
+        return new IntRect(x, y, width, height);
+    }
 }
 
 public sealed class Annotation

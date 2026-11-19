@@ -15,10 +15,10 @@ public sealed class ShotDocument
     public bool CanRedo => _redo.Count > 0;
     public event Action? Changed;
 
-    public ShotDocument(PixelBuffer source)
+    public ShotDocument(PixelBuffer source, IntRect? view = null)
     {
         Source = source;
-        View = new IntRect(0, 0, source.Width, source.Height);
+        View = view?.Clamp(source.Width, source.Height, 2) ?? new IntRect(0, 0, source.Width, source.Height);
     }
 
     public void AddAnnotation(Annotation annotation)
@@ -81,11 +81,19 @@ public sealed class ShotDocument
 
     public void SetView(IntRect view)
     {
-        var full = new IntRect(0, 0, Source.Width, Source.Height);
-        var next = full.Intersect(view);
-        if (next.Width < 2 || next.Height < 2 || next.Equals(View))
+        var next = view.Clamp(Source.Width, Source.Height, 2);
+        if (next.Equals(View))
             return;
         Commit(() => View = next);
+    }
+
+    public void PreviewView(IntRect view)
+    {
+        var next = view.Clamp(Source.Width, Source.Height, SelectionAdjust.MinSize);
+        if (next.Equals(View))
+            return;
+        View = next;
+        Changed?.Invoke();
     }
 
     public void BeginEdit() => _pending = Capture();

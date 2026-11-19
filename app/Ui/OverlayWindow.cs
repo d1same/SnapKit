@@ -99,6 +99,12 @@ internal sealed class OverlaySession
 
     public void RaiseFocusEditor() => FocusEditor?.Invoke();
 
+    public void Reframe(MonitorInfo monitor, IntRect local)
+    {
+        foreach (var window in _windows)
+            window.Reframe(monitor, local);
+    }
+
     public void CloseAll()
     {
         _done = true;
@@ -368,6 +374,25 @@ internal sealed class OverlayWindow : Window
             }
         }
         RedrawHole(0, 0, 0, 0);
+    }
+
+    public void Reframe(MonitorInfo monitor, IntRect local)
+    {
+        if (!_frozen)
+            return;
+        if (Shot.Monitor.Handle != monitor.Handle)
+        {
+            RedrawHole(0, 0, 0, 0);
+            HideSelection();
+            return;
+        }
+        int x = Math.Clamp(local.X, 0, Math.Max(0, Shot.Pixels.Width - 1));
+        int y = Math.Clamp(local.Y, 0, Math.Max(0, Shot.Pixels.Height - 1));
+        int w = Math.Clamp(local.Width, 1, Shot.Pixels.Width - x);
+        int h = Math.Clamp(local.Height, 1, Shot.Pixels.Height - y);
+        ShowRect(x, y, w, h, null);
+        HideSelection();
+        _sizePill.Visibility = Visibility.Collapsed;
     }
 
     private IntPtr HitTestHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)

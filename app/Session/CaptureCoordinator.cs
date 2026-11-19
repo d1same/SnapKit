@@ -117,7 +117,12 @@ internal sealed class CaptureCoordinator
         };
         try
         {
-            editor = InPlaceEditorWindow.Show(pick.Image, pick.ScreenX, pick.ScreenY, pick.Monitor, _state);
+            var shot = session.Shots.FirstOrDefault(item => item.Monitor.Handle == pick.Monitor.Handle);
+            var source = shot?.Pixels ?? pick.Image;
+            int originX = shot?.Monitor.X ?? pick.ScreenX;
+            int originY = shot?.Monitor.Y ?? pick.ScreenY;
+            var view = new IntRect(pick.ScreenX - originX, pick.ScreenY - originY, pick.Image.Width, pick.Image.Height);
+            editor = InPlaceEditorWindow.Show(source, view, originX, originY, pick.Monitor, _state, rect => session.Reframe(pick.Monitor, rect));
             editor.Closed += (_, _) => session.CloseAll();
             editor.Activate();
         }

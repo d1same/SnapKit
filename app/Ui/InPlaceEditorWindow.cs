@@ -13,19 +13,29 @@ internal sealed class InPlaceEditorWindow : Window
     private readonly ToolbarView _toolbar;
     private readonly Rectangle _frameInk;
     private readonly Rectangle _frame;
+    private readonly Border[] _handles;
+    private readonly Canvas _canvas;
     private readonly MonitorInfo _monitor;
     private readonly int _originX;
     private readonly int _originY;
+    private readonly Action<IntRect>? _reframe;
     private bool _discard;
     private int _placedW = -1;
     private int _placedH = -1;
+    private SelectionEdge? _adjust;
+    private IntRect _adjustStart;
+    private int _adjustScreenX;
+    private int _adjustScreenY;
+    private bool _adjusting;
+    private bool _recapture;
 
-    private InPlaceEditorWindow(EditorSession session, MonitorInfo monitor, int originX, int originY)
+    private InPlaceEditorWindow(EditorSession session, MonitorInfo monitor, int originX, int originY, Action<IntRect>? reframe)
     {
         _session = session;
         _monitor = monitor;
         _originX = originX;
         _originY = originY;
+        _reframe = reframe;
         Title = Brand.Name;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
@@ -41,13 +51,16 @@ internal sealed class InPlaceEditorWindow : Window
         _toolbar = new ToolbarView(showFit: false);
         _frameInk = Dash(Brushes.Black, 4);
         _frame = Dash(Brushes.White, 0);
+        _handles = new[] { Handle(), Handle(), Handle(), Handle() };
         Wire();
-        var canvas = new Canvas { Background = Brushes.Transparent };
-        canvas.Children.Add(_surface);
-        canvas.Children.Add(_frameInk);
-        canvas.Children.Add(_frame);
-        canvas.Children.Add(_toolbar);
-        Content = canvas;
+        _canvas = new Canvas { Background = Brushes.Transparent };
+        _canvas.Children.Add(_surface);
+        _canvas.Children.Add(_frameInk);
+        _canvas.Children.Add(_frame);
+        foreach (var handle in _handles)
+            _canvas.Children.Add(handle);
+        _canvas.Children.Add(_toolbar);
+        Content = _canvas;
         session.Document.Changed += () => Dispatcher.BeginInvoke(PlaceIfViewChanged);
         SourceInitialized += (_, _) =>
         {
@@ -57,6 +70,23 @@ internal sealed class InPlaceEditorWindow : Window
         PreviewKeyDown += (_, e) => EditorKeys.Handle(e, _session, _surface, Discard, null);
         ClickAway.Attach(this, Discard, () => _session.State.Settings.CloseOnClickAway);
         _session.Delivered += () => Dispatcher.BeginInvoke(Discard);
+        PreviewMouseLeftButtonDown += OnAdjustDown;
+        PreviewMouseMove += OnAdjustMove;
+        PreviewMouseLeftButtonUp += (_, e) => FinishAdjust(e);
+        LostMouseCapture += (_, _) =>
+        {
+            if (_recapture)
+                return;
+            if (_adjust != null && Mouse.LeftButton == MouseButtonState.Pressed)
+            {
+                _recapture = true;
+                CaptureMouse();
+                _recapture = false;
+                return;
+            }
+            FinishAdjust(null);
+        };
+        _session.Flash("Drag a corner to resize. Drag the edge to move it.");
         Closed += (_, _) =>
         {
             if (!_discard)
@@ -66,11 +96,15 @@ internal sealed class InPlaceEditorWindow : Window
         };
     }
 
-    public static InPlaceEditorWindow Show(PixelBuffer image, int screenX, int screenY, MonitorInfo monitor, AppState state)
+    public static InPlaceEditorWindow Show(PixelBuffer image, int screenX, int screenY, MonitorInfo monitor, AppState state) =>
+        Show(image, new IntRect(0, 0, image.Width, image.Height), screenX, screenY, monitor, state, null);
+
+    public static InPlaceEditorWindow Show(PixelBuffer source, IntRect view, int sourceScreenX, int sourceScreenY, MonitorInfo monitor, AppState state, Action<IntRect>? reframe)
     {
-        var recent = state.Recent.Add(image.Clone());
-        var session = new EditorSession(new ShotDocument(image), recent, state);
-        var window = new InPlaceEditorWindow(session, monitor, screenX, screenY);
+        var document = new ShotDocument(source, view);
+        var recent = state.Recent.Add(document.ComposeUnderlay());
+        var session = new EditorSession(document, recent, state);
+        var window = new InPlaceEditorWindow(session, monitor, sourceScreenX, sourceScreenY, reframe);
         window.Show();
         return window;
     }
@@ -193,6 +227,7 @@ internal sealed class InPlaceEditorWindow : Window
         Canvas.SetTop(_surface, imageTop);
         PlaceFrame(_frameInk, imageLeft, imageTop, imageWidth, imageHeight);
         PlaceFrame(_frame, imageLeft, imageTop, imageWidth, imageHeight);
+        PlaceHandles(imageLeft, imageTop, imageWidth, imageHeight);
 
         double toolX = imageX / scale;
         double toolY = below
@@ -206,8 +241,134 @@ internal sealed class InPlaceEditorWindow : Window
         Canvas.SetTop(_toolbar, toolY);
         Panel.SetZIndex(_toolbar, 8);
         Topmost = true;
-        WindowChrome.Place(this, winX, winY, winW, winH, scale, topmost: true, activate: true, inTaskbar: true);
+        WindowChrome.Place(this, winX, winY, winW, winH, scale, topmost: true, activate: !_adjusting, inTaskbar: true);
     }
+
+    private void PlaceHandles(double left, double top, double width, double height)
+    {
+        const double size = 12;
+        var spots = new[]
+        {
+            (left + 3, top + 3),
+            (left + width - size - 3, top + 3),
+            (left + width - size - 3, top + height - size - 3),
+            (left + 3, top + height - size - 3)
+        };
+        for (int i = 0; i < _handles.Length; i++)
+        {
+            Canvas.SetLeft(_handles[i], spots[i].Item1);
+            Canvas.SetTop(_handles[i], spots[i].Item2);
+            Panel.SetZIndex(_handles[i], 6);
+        }
+    }
+
+    private static Border Handle() => new()
+    {
+        Width = 12,
+        Height = 12,
+        Background = Brushes.White,
+        BorderBrush = Brushes.Black,
+        BorderThickness = new Thickness(1),
+        IsHitTestVisible = false,
+        SnapsToDevicePixels = true
+    };
+
+    private void OnAdjustDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || _adjust != null)
+            return;
+        var edge = HitAdjust(e.GetPosition(_canvas));
+        if (edge == null)
+            return;
+        e.Handled = true;
+        _adjust = edge;
+        _adjustStart = _session.Document.View;
+        NativeMethods.GetCursorPos(out var point);
+        _adjustScreenX = point.X;
+        _adjustScreenY = point.Y;
+        _adjusting = true;
+        _session.Document.BeginEdit();
+        Mouse.OverrideCursor = CursorFor(edge);
+        CaptureMouse();
+    }
+
+    private void OnAdjustMove(object sender, MouseEventArgs e)
+    {
+        if (_adjust == null)
+        {
+            Cursor = CursorFor(HitAdjust(e.GetPosition(_canvas)));
+            return;
+        }
+        if (e.LeftButton != MouseButtonState.Pressed)
+            return;
+        NativeMethods.GetCursorPos(out var point);
+        var next = SelectionAdjust.Apply(
+            _adjustStart,
+            _adjust.Value,
+            point.X - _adjustScreenX,
+            point.Y - _adjustScreenY,
+            _session.Document.Source.Width,
+            _session.Document.Source.Height);
+        _session.Document.PreviewView(next);
+        _reframe?.Invoke(_session.Document.View);
+    }
+
+    private void FinishAdjust(MouseButtonEventArgs? e)
+    {
+        if (_adjust == null)
+            return;
+        if (e != null)
+            e.Handled = true;
+        bool changed = !_session.Document.View.Equals(_adjustStart);
+        _adjust = null;
+        _adjusting = false;
+        Mouse.OverrideCursor = null;
+        Cursor = null;
+        if (IsMouseCaptured)
+            ReleaseMouseCapture();
+        _session.Document.EndEdit(changed);
+        _reframe?.Invoke(_session.Document.View);
+    }
+
+    private SelectionEdge? HitAdjust(Point dip)
+    {
+        double scale = _monitor.Scale <= 0 ? 1 : _monitor.Scale;
+        double left = Canvas.GetLeft(_surface);
+        double top = Canvas.GetTop(_surface);
+        if (double.IsNaN(left) || double.IsNaN(top))
+            return null;
+        double width = _session.Document.View.Width / scale;
+        double height = _session.Document.View.Height / scale;
+        double x = dip.X - left;
+        double y = dip.Y - top;
+        if (x < -8 || y < -8 || x > width + 8 || y > height + 8)
+            return null;
+        const double corner = 18;
+        const double edge = 12;
+        bool nearLeft = x <= corner;
+        bool nearRight = x >= width - corner;
+        bool nearTop = y <= corner;
+        bool nearBottom = y >= height - corner;
+        if (nearLeft && nearTop)
+            return SelectionEdge.NorthWest;
+        if (nearRight && nearTop)
+            return SelectionEdge.NorthEast;
+        if (nearRight && nearBottom)
+            return SelectionEdge.SouthEast;
+        if (nearLeft && nearBottom)
+            return SelectionEdge.SouthWest;
+        if (x <= edge || y <= edge || x >= width - edge || y >= height - edge)
+            return SelectionEdge.Move;
+        return null;
+    }
+
+    private static Cursor? CursorFor(SelectionEdge? edge) => edge switch
+    {
+        SelectionEdge.Move => Cursors.SizeAll,
+        SelectionEdge.NorthWest or SelectionEdge.SouthEast => Cursors.SizeNWSE,
+        SelectionEdge.NorthEast or SelectionEdge.SouthWest => Cursors.SizeNESW,
+        _ => null
+    };
 
     private static Rectangle Dash(Brush stroke, double offset) => new()
     {
