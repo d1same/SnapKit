@@ -52,18 +52,21 @@ internal static class SnapFinder
             Top = monitor.Y,
             Right = monitor.Right,
             Bottom = monitor.Bottom
-        }, "Entire screen", "");
+        }, "Entire screen", "", force: true);
 
         return found;
     }
 
-    private static void AddDistinct(List<SnapTarget> list, NativeMethods.Rect rect, string kind, string detail)
+    private static void AddDistinct(List<SnapTarget> list, NativeMethods.Rect rect, string kind, string detail, bool force = false)
     {
-        foreach (var existing in list)
+        if (!force)
         {
-            if (Math.Abs(existing.X - rect.Left) <= 12 && Math.Abs(existing.Y - rect.Top) <= 12
-                && Math.Abs(existing.Right - rect.Right) <= 12 && Math.Abs(existing.Bottom - rect.Bottom) <= 12)
-                return;
+            foreach (var existing in list)
+            {
+                if (Math.Abs(existing.X - rect.Left) <= 12 && Math.Abs(existing.Y - rect.Top) <= 12
+                    && Math.Abs(existing.Right - rect.Right) <= 12 && Math.Abs(existing.Bottom - rect.Bottom) <= 12)
+                    return;
+            }
         }
 
         if (list.Count >= 6)

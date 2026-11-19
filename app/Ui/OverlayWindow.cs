@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace SnapKit;
 
@@ -169,8 +170,14 @@ internal sealed class OverlayWindow : Window
     private readonly StackPanel _choiceRows = new();
     private List<SnapTarget> _snaps = new();
     private int _snapIndex;
-    private int _preferFromEnd = int.MaxValue;
+    private bool _follow = true;
+    private string? _lockedKind;
     private readonly List<Border> _choiceChips = new();
+    private DispatcherTimer? _aimTimer;
+    private double _showX, _showY, _showW, _showH;
+    private double _goalX, _goalY, _goalW, _goalH;
+    private SnapTarget? _wait;
+    private long _waitAt;
 
     public OverlayWindow(OverlaySession session, MonitorShot shot)
     {
@@ -254,11 +261,13 @@ internal sealed class OverlayWindow : Window
             Child = _hintText
         };
 
-        _choiceRows.Margin = new Thickness(8, 6, 8, 8);
+        _choiceRows.Orientation = Orientation.Horizontal;
+        _choiceRows.Margin = new Thickness(8, 0, 4, 8);
         _choiceHost = new Border
         {
-            HorizontalAlignment = HorizontalAlignment.Left,
+            HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 52, 0, 0),
             Visibility = Visibility.Collapsed,
             Background = Palette.Card,
             BorderBrush = Palette.Line,
@@ -270,16 +279,19 @@ internal sealed class OverlayWindow : Window
                 {
                     new TextBlock
                     {
-                        Text = "Click a target    ·    scroll changes it    ·    drag draws",
+                        Text = "Click a choice    ·    F is the whole screen    ·    drag draws a box",
                         Foreground = Palette.Muted,
                         FontFamily = Palette.Font,
                         FontSize = 11,
-                        Margin = new Thickness(12, 8, 12, 2)
+                        Margin = new Thickness(14, 8, 14, 4),
+                        HorizontalAlignment = HorizontalAlignment.Center
                     },
                     _choiceRows
                 }
             }
         };
+        _aimTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        _aimTimer.Tick += (_, _) => StepAim();
 
         Content = new Grid
         {
@@ -307,8 +319,18 @@ internal sealed class OverlayWindow : Window
             Opacity = 1;
             RefreshChrome();
         };
+        MouseLeave += (_, _) =>
+        {
+            if (_frozen || _dragging)
+                return;
+            _aimTimer?.Stop();
+            HideSelection();
+            RedrawHole(0, 0, 0, 0);
+            _choiceHost.Visibility = Visibility.Collapsed;
+        };
         Closing += (_, _) =>
         {
+            _aimTimer?.Stop();
             if (_closing)
                 return;
             _closing = true;
@@ -322,6 +344,7 @@ internal sealed class OverlayWindow : Window
     {
         _frozen = true;
         _dragging = false;
+        _aimTimer?.Stop();
         if (IsMouseCaptured)
             ReleaseMouseCapture();
         Cursor = Cursors.Arrow;
@@ -372,7 +395,7 @@ internal sealed class OverlayWindow : Window
             OverlayMode.Window => "Window    ·    Click the highlighted window    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
             OverlayMode.FullScreen => "Full screen    ·    Click to capture this monitor    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
             OverlayMode.ScrollPick => "Click the window to scroll-capture    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
-            _ => "Drag a box to capture just that    ·    click the dashed target    ·    scroll changes it    ·    Esc cancels"
+            _ => "The choices stay at the top. Drag a box, or click one. Esc cancels"
         };
         Cursor = _session.Mode == OverlayMode.Area ? Cursors.Cross : Cursors.Hand;
         if (_session.Mode != OverlayMode.Area)
@@ -422,6 +445,11 @@ internal sealed class OverlayWindow : Window
         else if (_session.Mode == OverlayMode.Area && e.Key is Key.Up or Key.Down)
         {
             CycleSnap(e.Key == Key.Up ? 1 : -1);
+            e.Handled = true;
+        }
+        else if (_session.Mode == OverlayMode.Area && e.Key == Key.F)
+        {
+            LockKind("Entire screen");
             e.Handled = true;
         }
     }
@@ -484,6 +512,7 @@ internal sealed class OverlayWindow : Window
                 _dragMoved = true;
             if (_dragMoved)
             {
+                _aimTimer?.Stop();
                 _choiceHost.Visibility = Visibility.Collapsed;
                 _dragX = Math.Min(_startX, x);
                 _dragY = Math.Min(_startY, y);
@@ -496,6 +525,8 @@ internal sealed class OverlayWindow : Window
         }
         if (_session.Mode == OverlayMode.Area)
         {
+            if (_choiceHost.IsMouseOver)
+                return;
             var (x, y) = CursorLocal();
             OfferSnaps(x, y);
             return;
@@ -560,16 +591,18 @@ internal sealed class OverlayWindow : Window
             Math.Clamp(point.Y - Shot.Monitor.Y, 0, maxY));
     }
 
-    private bool HeldByCurrentTarget(int localX, int localY)
+    private void LockKind(string kind)
     {
-        if (_snapIndex < 0 || _snapIndex >= _snaps.Count)
-            return false;
-        var current = _snaps[_snapIndex];
-        if (current.Kind == "Entire screen")
-            return false;
-        int x = Shot.Monitor.X + localX;
-        int y = Shot.Monitor.Y + localY;
-        return x >= current.X && x < current.Right && y >= current.Y && y < current.Bottom;
+        if (_snaps.Count == 0)
+        {
+            var (x, y) = CursorLocal();
+            OfferSnaps(x, y);
+        }
+        _follow = kind != "Entire screen" && _snaps.Count > 0 && _snaps[0].Kind == kind;
+        _lockedKind = _follow ? null : kind;
+        if (_snaps.Count == 0)
+            return;
+        ShowIndex(IndexForKind(_snaps, kind), animate: true);
     }
 
     private void FinishWindow(TopWindow window)
@@ -606,40 +639,177 @@ internal sealed class OverlayWindow : Window
         var found = SnapFinder.At(sx, sy, Shot.Monitor).ToList();
         if (found.Count == 0)
             return;
-        if (HeldByCurrentTarget(sx, sy))
-            return;
-        bool same = found.Count == _snaps.Count;
-        if (same)
-        {
-            for (int i = 0; i < found.Count; i++)
-            {
-                if (found[i].X != _snaps[i].X || found[i].Y != _snaps[i].Y || found[i].Width != _snaps[i].Width || found[i].Height != _snaps[i].Height || found[i].Kind != _snaps[i].Kind)
-                {
-                    same = false;
-                    break;
-                }
-            }
-        }
+        bool same = SameSnaps(found, _snaps);
         _snaps = found;
-        _snapIndex = _preferFromEnd == int.MaxValue
-            ? 0
-            : Math.Clamp(found.Count - 1 - _preferFromEnd, 0, found.Count - 1);
         if (!same)
             RebuildChoices();
         else
             MarkChips();
-        HighlightSnap();
+
+        if (!_follow && _lockedKind != null)
+        {
+            ShowIndex(IndexForKind(found, _lockedKind), animate: true);
+            return;
+        }
+
+        Consider(found[0], 0);
+    }
+
+    private void Consider(SnapTarget target, int index)
+    {
+        if (NearGoal(target))
+        {
+            _wait = null;
+            _snapIndex = index;
+            MarkChips();
+            return;
+        }
+        if (_wait == null || !SameTarget(_wait, target))
+        {
+            _wait = target;
+            _waitAt = Environment.TickCount64;
+            return;
+        }
+        if (Environment.TickCount64 - _waitAt < 90)
+            return;
+        _wait = null;
+        ShowIndex(index, animate: true);
     }
 
     private void CycleSnap(int delta)
     {
         if (_snaps.Count == 0)
+        {
+            var (x, y) = CursorLocal();
+            OfferSnaps(x, y);
+        }
+        if (_snaps.Count == 0)
             return;
         _snapIndex = Math.Clamp(_snapIndex + delta, 0, _snaps.Count - 1);
-        _preferFromEnd = _snaps.Count - 1 - _snapIndex;
-        MarkChips();
-        HighlightSnap();
+        var kind = _snaps[_snapIndex].Kind;
+        _follow = _snapIndex == 0 && kind != "Entire screen";
+        _lockedKind = _follow ? null : kind;
+        _wait = null;
+        ShowIndex(_snapIndex, animate: true);
     }
+
+    private void ShowIndex(int index, bool animate)
+    {
+        if (_snaps.Count == 0)
+            return;
+        index = Math.Clamp(index, 0, _snaps.Count - 1);
+        _snapIndex = index;
+        MarkChips();
+        var local = Intersect(BoundsOf(_snaps[index]));
+        Aim(local.X, local.Y, local.Width, local.Height, immediate: !animate);
+        _choiceHost.Visibility = Visibility.Visible;
+    }
+
+    private static int IndexForKind(List<SnapTarget> found, string kind)
+    {
+        if (kind == "Entire screen")
+        {
+            int screen = found.FindIndex(item => item.Kind == "Entire screen");
+            return screen >= 0 ? screen : found.Count - 1;
+        }
+        int exact = found.FindIndex(item => item.Kind == kind);
+        if (exact >= 0)
+            return exact;
+        for (int i = found.Count - 1; i >= 0; i--)
+        {
+            if (found[i].Kind != "Entire screen")
+                return i;
+        }
+        return 0;
+    }
+
+    private void Aim(int x, int y, int w, int h, bool immediate)
+    {
+        if (_showW > 1 && Math.Abs(_goalX - x) < 2 && Math.Abs(_goalY - y) < 2 && Math.Abs(_goalW - w) < 2 && Math.Abs(_goalH - h) < 2)
+            return;
+        _goalX = x;
+        _goalY = y;
+        _goalW = w;
+        _goalH = h;
+        if (immediate || _showW < 1)
+        {
+            _showX = x;
+            _showY = y;
+            _showW = w;
+            _showH = h;
+            PaintAim();
+            _aimTimer?.Stop();
+            return;
+        }
+        _aimTimer?.Start();
+    }
+
+    private void StepAim()
+    {
+        _showX += (_goalX - _showX) * 0.38;
+        _showY += (_goalY - _showY) * 0.38;
+        _showW += (_goalW - _showW) * 0.38;
+        _showH += (_goalH - _showH) * 0.38;
+        bool settled = Math.Abs(_goalX - _showX) < 0.6 && Math.Abs(_goalY - _showY) < 0.6
+            && Math.Abs(_goalW - _showW) < 0.6 && Math.Abs(_goalH - _showH) < 0.6;
+        if (settled)
+        {
+            _showX = _goalX;
+            _showY = _goalY;
+            _showW = _goalW;
+            _showH = _goalH;
+            _aimTimer?.Stop();
+        }
+        PaintAim();
+    }
+
+    private void PaintAim()
+    {
+        int x = (int)Math.Round(_showX);
+        int y = (int)Math.Round(_showY);
+        int w = Math.Max(1, (int)Math.Round(_showW));
+        int h = Math.Max(1, (int)Math.Round(_showH));
+        ShowRect(x, y, w, h, null);
+        _sizePill.Visibility = Visibility.Collapsed;
+        _loupe.Visibility = Visibility.Collapsed;
+    }
+
+    private bool NearGoal(SnapTarget target)
+    {
+        var local = Intersect(BoundsOf(target));
+        return _showW > 1
+            && Math.Abs(_goalX - local.X) < 16
+            && Math.Abs(_goalY - local.Y) < 16
+            && Math.Abs(_goalW - local.Width) < 16
+            && Math.Abs(_goalH - local.Height) < 16;
+    }
+
+    private static bool SameTarget(SnapTarget a, SnapTarget b) =>
+        a.Kind == b.Kind
+        && Math.Abs(a.X - b.X) < 16
+        && Math.Abs(a.Y - b.Y) < 16
+        && Math.Abs(a.Width - b.Width) < 16
+        && Math.Abs(a.Height - b.Height) < 16;
+
+    private static bool SameSnaps(List<SnapTarget> a, List<SnapTarget> b)
+    {
+        if (a.Count != b.Count)
+            return false;
+        for (int i = 0; i < a.Count; i++)
+        {
+            if (!SameTarget(a[i], b[i]))
+                return false;
+        }
+        return true;
+    }
+
+    private static NativeMethods.Rect BoundsOf(SnapTarget target) => new()
+    {
+        Left = target.X,
+        Top = target.Y,
+        Right = target.Right,
+        Bottom = target.Bottom
+    };
 
     private void RebuildChoices()
     {
@@ -651,21 +821,38 @@ internal sealed class OverlayWindow : Window
             var chip = new Border
             {
                 CornerRadius = new CornerRadius(7),
-                Padding = new Thickness(10, 6, 10, 6),
+                Padding = new Thickness(12, 7, 12, 7),
                 Margin = new Thickness(6, 2, 6, 2),
+                MinWidth = _snaps[i].Kind == "Entire screen" ? 132 : 0,
                 Cursor = Cursors.Hand,
+                ToolTip = _snaps[i].Line,
                 Child = new TextBlock
                 {
-                    Text = _snaps[i].Line,
+                    Text = _snaps[i].Kind,
                     Foreground = Palette.Text,
                     FontFamily = Palette.Font,
                     FontSize = 13
                 }
             };
+            chip.MouseEnter += (_, _) =>
+            {
+                if (_frozen || _dragMoved)
+                    return;
+                _wait = null;
+                ShowIndex(index, animate: true);
+            };
+            chip.MouseLeave += (_, _) =>
+            {
+                if (_frozen || _dragging)
+                    return;
+                var (x, y) = CursorLocal();
+                OfferSnaps(x, y);
+            };
             chip.MouseLeftButtonDown += (_, e) =>
             {
                 e.Handled = true;
                 _dragging = false;
+                _aimTimer?.Stop();
                 if (IsMouseCaptured)
                     ReleaseMouseCapture();
                 if (index < _snaps.Count)
@@ -687,42 +874,6 @@ internal sealed class OverlayWindow : Window
             _choiceChips[i].BorderBrush = on ? Brushes.White : Brushes.Transparent;
             _choiceChips[i].BorderThickness = new Thickness(1);
         }
-    }
-
-    private void HighlightSnap()
-    {
-        if (_snapIndex < 0 || _snapIndex >= _snaps.Count || ActualWidth < 1)
-            return;
-        var target = _snaps[_snapIndex];
-        var local = Intersect(new NativeMethods.Rect
-        {
-            Left = target.X,
-            Top = target.Y,
-            Right = target.Right,
-            Bottom = target.Bottom
-        });
-        ShowRect(local.X, local.Y, local.Width, local.Height, target.Kind);
-        _sizePill.Visibility = Visibility.Collapsed;
-        _loupe.Visibility = Visibility.Collapsed;
-        PlaceChoices();
-    }
-
-    private void PlaceChoices()
-    {
-        _choiceHost.Measure(new Size(320, 640));
-        double hostW = Math.Max(160, _choiceHost.DesiredSize.Width);
-        double hostH = Math.Max(36, _choiceHost.DesiredSize.Height);
-        double sx = ActualWidth / Math.Max(1, Shot.Pixels.Width);
-        double sy = ActualHeight / Math.Max(1, Shot.Pixels.Height);
-        double left = (_selX + _selW) * sx + 12;
-        double top = _selY * sy;
-        if (left + hostW > ActualWidth - 8)
-            left = _selX * sx - hostW - 12;
-        if (left < 8)
-            left = 8;
-        if (top + hostH > ActualHeight - 8)
-            top = Math.Max(8, ActualHeight - hostH - 8);
-        _choiceHost.Margin = new Thickness(left, Math.Max(8, top), 0, 0);
     }
 
     private void CaptureSnap(SnapTarget target)

@@ -8,9 +8,9 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://qu.ax/7NHJK)
+[SnapKit-win-x64.zip](https://qu.ax/stt0F)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 10:42 PM ET**. Unzip it and run `SnapKit.exe` once.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 10:47 PM ET**. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens in the tray. Running a newer zip closes whatever SnapKit is already running and replaces it.
 
@@ -39,7 +39,7 @@ You drag a box around a dialog, press `T`, type "Click Save", then right-click t
 
 ### While you are selecting
 
-Move the pointer over a folder, a browser tab, or a window. SnapKit draws a dashed line around that target and keeps it there until the pointer leaves it. The list beside it can switch to the window or the whole screen. Scroll, or press Up and Down, to change the choice. Click the outline or a row to capture it. Drag when you want your own box. A drag captures only the box, not the window behind it.
+A bar stays at the top of the screen: the tab or folder, the window, and **Entire screen**. The dashed outline eases to the choice under the pointer instead of jumping. Rest on a window and it settles. Move onto **Entire screen**, press `F`, or scroll to that choice when you want the whole monitor. Click a choice to capture it. Drag when you want your own box. A drag captures only that box.
 
 - `Space` cycles area, window, and full screen.
 - `Enter` captures the highlighted target, or the monitor in full-screen mode.
