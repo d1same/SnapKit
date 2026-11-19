@@ -52,6 +52,8 @@ internal sealed class CaptureCoordinator
             if (shots.Count == 0)
                 throw new InvalidOperationException("No monitors were found.");
 
+            if (purpose != OverlayPurpose.Scroll)
+                Feedback(shots.Select(shot => shot.Monitor));
             var session = new OverlaySession(shots, mode, purpose);
             session.Finished += pick => OnOverlayFinished(session, purpose, pick);
             foreach (var shot in shots)
@@ -61,8 +63,6 @@ internal sealed class CaptureCoordinator
                 window.Show();
             }
             session.FocusUnderCursor();
-            if (purpose != OverlayPurpose.Scroll)
-                Feedback(shots.Select(shot => shot.Monitor));
         }
         catch (Exception ex)
         {

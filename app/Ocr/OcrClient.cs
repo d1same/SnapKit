@@ -9,10 +9,10 @@ namespace SnapKit;
 
 internal static class OcrClient
 {
-    public static Task<string> RecognizeAsync(PixelBuffer source)
+    public static Task<OcrPage> RecognizeAsync(PixelBuffer source)
     {
         var copy = source.Clone();
-        var done = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var done = new TaskCompletionSource<OcrPage>(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() => Run(copy, done))
         {
             IsBackground = true,
@@ -23,7 +23,7 @@ internal static class OcrClient
         return done.Task;
     }
 
-    private static void Run(PixelBuffer source, TaskCompletionSource<string> done)
+    private static void Run(PixelBuffer source, TaskCompletionSource<OcrPage> done)
     {
         var dispatcher = Dispatcher.CurrentDispatcher;
         _ = dispatcher.InvokeAsync(async () =>
@@ -44,7 +44,7 @@ internal static class OcrClient
         Dispatcher.Run();
     }
 
-    private static async Task<string> Recognize(PixelBuffer source)
+    private static async Task<OcrPage> Recognize(PixelBuffer source)
     {
         if (source.Width < 3 || source.Height < 3)
             throw new InvalidOperationException("That area is too small to read.");
@@ -64,7 +64,45 @@ internal static class OcrClient
         working.ForceOpaque();
         using var bitmap = await LoadSoftwareBitmap(working);
         var result = await engine.RecognizeAsync(bitmap);
-        return (result.Text ?? "").Trim();
+        double scaleX = source.Width / (double)Math.Max(1, working.Width);
+        double scaleY = source.Height / (double)Math.Max(1, working.Height);
+        var words = new List<OcrToken>();
+        if (result?.Lines != null)
+        {
+            int lineIndex = 0;
+            foreach (var line in result.Lines)
+            {
+                int count = line.Words?.Count ?? 0;
+                string lineText = line.Text ?? "";
+                if (line.Words != null)
+                {
+                    foreach (var word in line.Words)
+                    {
+                        var bounds = word.BoundingRect;
+                        if (bounds.Width < 1 || bounds.Height < 1 || string.IsNullOrWhiteSpace(word.Text))
+                            continue;
+                        words.Add(new OcrToken
+                        {
+                            Text = word.Text.Trim(),
+                            Line = lineIndex,
+                            LineText = lineText,
+                            WordsInLine = count,
+                            X = bounds.X * scaleX,
+                            Y = bounds.Y * scaleY,
+                            Width = bounds.Width * scaleX,
+                            Height = bounds.Height * scaleY
+                        });
+                    }
+                }
+                lineIndex++;
+            }
+        }
+
+        return new OcrPage
+        {
+            Text = (result?.Text ?? "").Trim(),
+            Words = words
+        };
     }
 
     private static async Task<SoftwareBitmap> LoadSoftwareBitmap(PixelBuffer source)
@@ -75,6 +113,7 @@ internal static class OcrClient
         writer.WriteBytes(png);
         await writer.StoreAsync();
         writer.DetachStream();
+        writer.Dispose();
         stream.Seek(0);
         var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
         return await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);

@@ -8,9 +8,9 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://qu.ax/o07Sj)
+[SnapKit-win-x64.zip](https://qu.ax/7NHJK)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 9:32 PM ET**. Unzip it and run `SnapKit.exe` once.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 10:42 PM ET**. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens in the tray. Running a newer zip closes whatever SnapKit is already running and replaces it.
 
@@ -83,7 +83,7 @@ Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` 
 
 **Pin** floats the picture always-on-top. Drag it. Right-click and choose **Copy**, or double-click, or press `Ctrl+C`. `Ctrl+S` saves it. `Esc` closes it.
 
-OCR of the whole capture is the OCR button on the toolbar. The text is copied and shown in a small panel. `Esc` closes that panel. If OCR fails, the message stays in the panel and the capture stays editable. OCR uses the Windows language already installed on the PC. No cloud.
+OCR reads the capture on the PC, then highlights each word on the picture. Drag across the words you want and that text is copied. `Ctrl+A` copies all of it. `Esc` closes the highlighter and leaves the capture editable. If OCR fails, the message stays in a small window with **Copy error**. OCR uses the Windows language already installed. No cloud.
 
 ### Global shortcuts
 

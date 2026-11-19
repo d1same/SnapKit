@@ -47,12 +47,12 @@ internal static class OcrFlow
                     TaskScheduler.Default);
                 throw new TimeoutException("OCR took too long. You can keep editing.");
             }
-            var text = await work;
-            Present(owner, text, null, status);
+            var page = await work;
+            Present(owner, snapshot, page, null, status);
         }
         catch (Exception ex)
         {
-            Present(owner, "", ex.Message, status);
+            Present(owner, snapshot, null, ex.Message, status);
         }
         finally
         {
@@ -61,33 +61,22 @@ internal static class OcrFlow
         }
     }
 
-    private static void Present(Window? owner, string text, string? error, Action<string>? status)
+    private static void Present(Window? owner, PixelBuffer image, OcrPage? page, string? error, Action<string>? status)
     {
         void Show()
         {
             Unstick(owner);
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                try { Clipboard.SetText(text); }
-                catch { /* Another app has the clipboard. The panel still shows the text. */ }
-            }
-
-            status?.Invoke(error ?? (string.IsNullOrWhiteSpace(text) ? "No text found" : "Text copied"));
-            bool restoreTopmost = owner is { Topmost: true };
-            if (restoreTopmost && owner != null)
-                owner.Topmost = false;
+            status?.Invoke(error ?? (page == null || page.Words.Count == 0 ? "No text found" : "Drag across the words you want."));
             try
             {
-                var window = new OcrWindow(text, error);
-                if (restoreTopmost && owner != null)
-                    window.Closed += (_, _) => owner.Topmost = true;
+                Window window = error != null || page == null
+                    ? new OcrWindow("", error ?? "OCR failed.")
+                    : new OcrSelectWindow(image, page);
                 window.Show();
                 window.Activate();
             }
             catch (Exception ex)
             {
-                if (restoreTopmost && owner != null)
-                    owner.Topmost = true;
                 status?.Invoke(ex.Message);
             }
         }
