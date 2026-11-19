@@ -13,6 +13,7 @@ internal static class EditorKeys
         bool ctrlShift = Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
         if (ctrl && e.Key == Key.C)
         {
+            surface.CommitEditing();
             session.Copy();
             e.Handled = true;
             return true;

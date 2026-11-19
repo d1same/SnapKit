@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Windows.Threading;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 
@@ -6,11 +7,49 @@ namespace SnapKit;
 
 internal static class OcrClient
 {
-    public static async Task<string> RecognizeAsync(PixelBuffer source)
+    public static Task<string> RecognizeAsync(PixelBuffer source)
     {
+        var copy = source.Clone();
+        var done = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() => Run(copy, done))
+        {
+            IsBackground = true,
+            Name = "SnapKit OCR"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return done.Task;
+    }
+
+    private static void Run(PixelBuffer source, TaskCompletionSource<string> done)
+    {
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        _ = dispatcher.InvokeAsync(async () =>
+        {
+            try
+            {
+                done.TrySetResult(await Recognize(source));
+            }
+            catch (Exception ex)
+            {
+                done.TrySetException(ex);
+            }
+            finally
+            {
+                dispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+            }
+        });
+        Dispatcher.Run();
+    }
+
+    private static async Task<string> Recognize(PixelBuffer source)
+    {
+        if (source.Width < 3 || source.Height < 3)
+            throw new InvalidOperationException("That area is too small to read.");
+
         var engine = OcrEngine.TryCreateFromUserProfileLanguages();
         if (engine == null)
-            throw new InvalidOperationException("Windows OCR has no language installed. Add one in Settings → Time & language → Language & region.");
+            throw new InvalidOperationException("Windows OCR has no language installed. Add one in Settings, under Time & language, then Language & region.");
 
         var working = source;
         const int maxEdge = 4000;
@@ -20,6 +59,7 @@ internal static class OcrClient
             working = source.Resize(Math.Max(1, (int)(source.Width * scale)), Math.Max(1, (int)(source.Height * scale)));
         }
 
+        working.ForceOpaque();
         using var bitmap = ToSoftwareBitmap(working);
         var result = await engine.RecognizeAsync(bitmap);
         return (result.Text ?? "").Trim();
@@ -27,7 +67,7 @@ internal static class OcrClient
 
     private static SoftwareBitmap ToSoftwareBitmap(PixelBuffer source)
     {
-        var bitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, source.Width, source.Height, BitmapAlphaMode.Ignore);
+        var bitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, source.Width, source.Height, BitmapAlphaMode.Straight);
         using var buffer = bitmap.LockBuffer(BitmapBufferAccessMode.Write);
         using var reference = buffer.CreateReference();
         ((IMemoryBufferByteAccess)reference).GetBuffer(out IntPtr data, out uint capacity);

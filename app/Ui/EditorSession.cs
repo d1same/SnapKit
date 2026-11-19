@@ -37,7 +37,7 @@ internal sealed class EditorSession
     public string ColorHex { get; private set; } = "#FF3B30";
     public double Stroke { get; private set; } = 3;
     public double FontSize { get; private set; } = 18;
-    public string Status { get; private set; } = "Ctrl+C copy    ·    Ctrl+S save    ·    Esc discards";
+    public string Status { get; private set; } = "Right-click copies the picture. Ctrl+S saves. Esc discards.";
     public event Action? Changed;
 
     public void SelectTool(EditorTool tool)
@@ -52,7 +52,7 @@ internal sealed class EditorSession
             EditorTool.Picker => "Click a pixel. Its hex is the new color.",
             EditorTool.Blur => "Drag a box to pixelate it.",
             EditorTool.Spotlight => "Drag a box. Everything outside it dims.",
-            _ => "Ctrl+C copy    ·    Ctrl+S save    ·    Esc discards"
+            _ => "Right-click copies the picture. Ctrl+S saves. Esc discards."
         };
         Changed?.Invoke();
     }
@@ -93,7 +93,7 @@ internal sealed class EditorSession
         var bitmap = Render();
         ImageFile.Copy(bitmap);
         State.Recent.Update(Recent, BitmapConvert.ToPixelBuffer(bitmap));
-        Flash("Copied");
+        Flash("Copied. Paste it anywhere.");
     }
 
     public bool Save(Window owner)

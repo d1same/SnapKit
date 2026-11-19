@@ -14,7 +14,16 @@ internal sealed class OcrWindow : Window
         MinHeight = 220;
         Background = Palette.Bg;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        ShowInTaskbar = true;
         Topmost = true;
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                Close();
+                e.Handled = true;
+            }
+        };
 
         var body = string.IsNullOrWhiteSpace(text) ? "" : text;
         var status = error ?? (string.IsNullOrWhiteSpace(body) ? "No text found in that area." : "Copied to the clipboard.");

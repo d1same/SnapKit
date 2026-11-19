@@ -119,7 +119,7 @@ internal sealed class ToolbarView : Border
         options.Children.Add(_redo);
         options.Children.Add(Chip(Label("OCR"), "Read text in this capture", () => OcrClicked?.Invoke()));
         options.Children.Add(Chip(Icon("M8,2.2 V9.5 M5.2,4.2 H10.8 M6,12.5 H10"), "Pin on top", () => PinClicked?.Invoke()));
-        options.Children.Add(Chip(Icon("M5,5 H11 V8 H13 L8,13 L3,8 H5 Z"), "Copy  (Ctrl+C)", () => CopyClicked?.Invoke()));
+        options.Children.Add(Chip(Icon("M5,5 H11 V8 H13 L8,13 L3,8 H5 Z"), "Copy the marked-up picture  (right-click or Ctrl+C)", () => CopyClicked?.Invoke()));
         options.Children.Add(Chip(Icon("M4,3 H10 L13,6 V13 H4 Z M10,3 V6 H13"), "Save  (Ctrl+S)", () => SaveClicked?.Invoke()));
         if (showFit)
             options.Children.Add(Chip(Label("Fit"), "Fit the image in the window", () => FitClicked?.Invoke()));
@@ -127,7 +127,7 @@ internal sealed class ToolbarView : Border
 
         _hint = new TextBlock
         {
-            Text = "Ctrl+C copy    ·    Ctrl+S save    ·    Esc discards",
+            Text = "Right-click copies the picture. Ctrl+S saves. Esc discards.",
             Foreground = Palette.Muted,
             FontFamily = Palette.Font,
             FontSize = 11,

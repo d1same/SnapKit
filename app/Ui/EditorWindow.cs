@@ -108,9 +108,18 @@ internal sealed class EditorWindow : Window
         };
         _toolbar.UndoClicked += () => _session.Document.Undo();
         _toolbar.RedoClicked += () => _session.Document.Redo();
-        _toolbar.CopyClicked += () => _session.Copy();
+        ShotMenu.Attach(_surface, _surface, _session, this);
+        _toolbar.CopyClicked += () =>
+        {
+            _surface.CommitEditing();
+            _session.Copy();
+        };
         _toolbar.SaveClicked += () => _session.Save(this);
-        _toolbar.OcrClicked += () => _ = ReadTextAsync();
+        _toolbar.OcrClicked += () =>
+        {
+            _surface.CommitEditing();
+            OcrFlow.Start(_session.Document.ComposeUnderlay(), _session.Flash, this);
+        };
         _toolbar.PinClicked += Pin;
         _toolbar.CloseClicked += Discard;
         _toolbar.FitClicked += Fit;
@@ -174,23 +183,6 @@ internal sealed class EditorWindow : Window
         catch (Exception ex)
         {
             _session.State.Tray?.Balloon(Brand.Name, ex.Message);
-        }
-    }
-
-    private async Task ReadTextAsync()
-    {
-        try
-        {
-            var text = await OcrClient.RecognizeAsync(_session.Document.ComposeUnderlay());
-            if (!string.IsNullOrWhiteSpace(text))
-                Clipboard.SetText(text);
-            _session.Flash(string.IsNullOrWhiteSpace(text) ? "No text found" : "Text copied");
-            var window = new OcrWindow(text) { Owner = this };
-            window.Show();
-        }
-        catch (Exception ex)
-        {
-            new OcrWindow("", ex.Message) { Owner = this }.Show();
         }
     }
 

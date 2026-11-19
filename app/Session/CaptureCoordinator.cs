@@ -89,7 +89,9 @@ internal sealed class CaptureCoordinator
             return;
         if (purpose == OverlayPurpose.Ocr)
         {
-            _ = ShowOcr(pick.Image);
+            var image = pick.Image;
+            System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                OcrFlow.Start(image, message => _state.Tray?.Balloon(Brand.Name, message), null)));
             return;
         }
         var editor = InPlaceEditorWindow.Show(pick.Image, pick.ScreenX, pick.ScreenY, pick.Monitor, _state);
@@ -227,21 +229,6 @@ internal sealed class CaptureCoordinator
         {
             if (countdown != null && countdown.IsVisible)
                 countdown.Close();
-        }
-    }
-
-    private async Task ShowOcr(PixelBuffer image)
-    {
-        try
-        {
-            var text = await OcrClient.RecognizeAsync(image);
-            if (!string.IsNullOrWhiteSpace(text))
-                Clipboard.SetText(text);
-            new OcrWindow(text).Show();
-        }
-        catch (Exception ex)
-        {
-            new OcrWindow("", ex.Message).Show();
         }
     }
 

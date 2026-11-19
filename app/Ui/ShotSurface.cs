@@ -61,6 +61,13 @@ internal sealed class ShotSurface : Grid
         OnDocumentChanged();
     }
 
+    public void CommitEditing()
+    {
+        if (_draft != null || _moving != null)
+            FinishDrag(cancel: false);
+        CommitText();
+    }
+
     public void CancelText()
     {
         if (_editing == null)
@@ -344,7 +351,8 @@ internal sealed class ShotSurface : Grid
             TextWrapping = TextWrapping.Wrap,
             FontFamily = Palette.Font,
             CaretBrush = Brushes.White,
-            Visibility = Visibility.Collapsed
+            Visibility = Visibility.Collapsed,
+            ContextMenu = null
         };
         _box.LostKeyboardFocus += (_, _) => CommitText();
         _box.PreviewKeyDown += (_, e) =>

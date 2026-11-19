@@ -8,9 +8,9 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://qu.ax/jGWSZ)
+[SnapKit-win-x64.zip](https://qu.ax/cZRX4)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 7:23 PM ET**. Unzip, then run `SnapKit.exe`.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 7:34 PM ET**. Unzip, then run `SnapKit.exe`.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -18,7 +18,7 @@ Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **R
 
 Left-click the tray icon to capture an area. Right-click for the menu.
 
-You drag a box around a dialog, press `T`, type "Click Save", then `Ctrl+C`. The picture is on the clipboard. A file appears only if you press `Ctrl+S`.
+You drag a box around a dialog, press `T`, type "Click Save", then right-click the picture and choose **Copy**. Paste it into chat, email, or a ticket. A file appears only if you press `Ctrl+S`.
 
 ### Tray menu
 
@@ -68,15 +68,16 @@ The toolbar sits next to the selection.
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` or `Ctrl+Shift+Z` | Redo |
 | `Delete` | Remove the selected mark |
+| Right-click | Copy the marked-up picture |
 | `Ctrl+C` | Copy the picture |
 | `Ctrl+S` | Save as PNG or JPG |
 | `Esc` | Discard the edits and close |
 
 Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` while typing cancels that edit.
 
-**Pin** floats the picture always-on-top. Drag it. Double-click or `Ctrl+C` copies it. `Ctrl+S` saves it. `Esc` closes it.
+**Pin** floats the picture always-on-top. Drag it. Right-click and choose **Copy**, or double-click, or press `Ctrl+C`. `Ctrl+S` saves it. `Esc` closes it.
 
-OCR of the whole capture is the OCR button on the toolbar. The text is copied and shown in a small panel. OCR uses the Windows language already installed on the PC. No cloud.
+OCR of the whole capture is the OCR button on the toolbar. The text is copied and shown in a small panel. `Esc` closes that panel. If OCR fails, the message stays in the panel and the capture stays editable. OCR uses the Windows language already installed on the PC. No cloud.
 
 ### Global shortcuts
 
