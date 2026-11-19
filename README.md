@@ -8,9 +8,9 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://qu.ax/IVDBz)
+[SnapKit-win-x64.zip](https://qu.ax/Wiucr)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 7:44 PM ET**. Unzip it and run `SnapKit.exe` once.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 8:00 PM ET**. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens in the tray. Running a newer zip later updates that same install. Quit SnapKit from the tray first if Windows says the file is in use.
 
@@ -39,11 +39,13 @@ You drag a box around a dialog, press `T`, type "Click Save", then right-click t
 
 ### While you are selecting
 
-- Drag to pick an area. A size readout and a magnifier follow the cursor.
-- Hover a window and click to grab that window.
-- `Space` cycles area, window, full screen.
-- `Enter` grabs the current monitor in full-screen mode.
+Move the pointer over a folder, a browser tab, a window, or the empty desktop. SnapKit outlines that target and lists the choices beside it, from the smallest pane up to the whole screen. Scroll, or press Up and Down, to move between them. Click the outline or a row in the list to capture it. Drag when you want a box of your own.
+
+- `Space` cycles area, window, and full screen.
+- `Enter` captures the highlighted target, or the monitor in full-screen mode.
 - `Esc` or right-click cancels.
+
+The shot stays where you took it. The rest of that screen stays dimmed behind it, so arrows and callouts point at the real window. `Esc` closes the editor and the dimmed screen. `Ctrl+Alt+Shift+Esc` quits SnapKit if a window is stuck.
 
 A selection stays on one monitor. Use **All monitors** for a combined shot.
 
@@ -134,6 +136,6 @@ GIF and MP4 recording is left for v2. The hook is `IScreenRecorder` in `app/Capt
 - Scrolling capture moves the mouse onto the window, scrolls with the wheel, and stitches by overlap. It stops at the end of the page, on `Esc`, or at 16,000 pixels. A window that does not scroll with the wheel, or a page that keeps animating, can stop the stitch early.
 - The scrollbar column is ignored. A fixed header and footer are kept from the first frame.
 - Cross-monitor drag is not supported.
-- After you finish a selection, the full-screen overlay closes. The editor is only as large as the picture and the toolbar, and it is not pinned above other apps.
+- After you finish a selection, that screen stays dimmed with the shot sitting on the spot you captured. The toolbar is next to the shot. `Esc` closes both.
 - `Ctrl+Alt+Shift+Esc` and the tray **Exit** command end the process from outside the window that draws the capture.
 - This build was compiled and unit-tested here. The window, hotkeys, OCR, and install were not run on a Windows desktop. OCR now decodes a PNG through the Windows runtime instead of casting a COM buffer.

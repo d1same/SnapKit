@@ -15,7 +15,7 @@ internal sealed class OcrWindow : Window
         Background = Palette.Bg;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ShowInTaskbar = true;
-        Topmost = false;
+        Topmost = true;
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == System.Windows.Input.Key.Escape)

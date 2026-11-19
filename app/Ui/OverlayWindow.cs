@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
@@ -48,6 +49,8 @@ internal sealed class OverlaySession
     public OverlayPurpose Purpose { get; }
     public bool Frozen { get; private set; }
     public event Action<CapturePick?>? Finished;
+    public event Action? Dismissed;
+    public event Action? FocusEditor;
 
     public void Add(OverlayWindow window) => _windows.Add(window);
 
@@ -65,13 +68,34 @@ internal sealed class OverlaySession
         if (_done)
             return;
         _done = true;
-        foreach (var window in _windows.ToList())
+        if (pick?.Image == null || Purpose != OverlayPurpose.Edit)
         {
-            window.Topmost = false;
-            window.ForceClose();
+            foreach (var window in _windows.ToList())
+            {
+                window.Topmost = false;
+                window.ForceClose();
+            }
+        }
+        else
+        {
+            Frozen = true;
+            foreach (var window in _windows)
+                window.Freeze(pick);
         }
         Finished?.Invoke(pick);
     }
+
+    public void Dismiss()
+    {
+        if (!_done)
+        {
+            Complete(null);
+            return;
+        }
+        Dismissed?.Invoke();
+    }
+
+    public void RaiseFocusEditor() => FocusEditor?.Invoke();
 
     public void CloseAll()
     {
@@ -121,6 +145,13 @@ internal sealed class OverlayWindow : Window
     private int _selH;
     private bool _frozen;
     private bool _closing;
+    private bool _dragMoved;
+    private readonly Border _choiceHost;
+    private readonly StackPanel _choiceRows = new();
+    private List<SnapTarget> _snaps = new();
+    private int _snapIndex;
+    private int _preferFromEnd = int.MaxValue;
+    private readonly List<Border> _choiceChips = new();
 
     public OverlayWindow(OverlaySession session, MonitorShot shot)
     {
@@ -204,9 +235,36 @@ internal sealed class OverlayWindow : Window
             Child = _hintText
         };
 
+        _choiceRows.Margin = new Thickness(8, 6, 8, 8);
+        _choiceHost = new Border
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Visibility = Visibility.Collapsed,
+            Background = Palette.Card,
+            BorderBrush = Palette.Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Child = new StackPanel
+            {
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "Click a target    ·    scroll changes it    ·    drag draws",
+                        Foreground = Palette.Muted,
+                        FontFamily = Palette.Font,
+                        FontSize = 11,
+                        Margin = new Thickness(12, 8, 12, 2)
+                    },
+                    _choiceRows
+                }
+            }
+        };
+
         Content = new Grid
         {
-            Children = { _image, _dim, _selection, _sizePill, _loupe, _hint }
+            Children = { _image, _dim, _selection, _sizePill, _loupe, _hint, _choiceHost }
         };
 
         var bitmap = BitmapConvert.ToBitmapSource(shot.Pixels);
@@ -218,12 +276,15 @@ internal sealed class OverlayWindow : Window
         MouseLeftButtonDown += OnDown;
         MouseMove += OnMove;
         MouseLeftButtonUp += OnUp;
-        MouseRightButtonDown += (_, _) => _session.Complete(null);
+        PreviewMouseWheel += OnWheel;
+        MouseRightButtonDown += (_, _) => _session.Dismiss();
         PreviewKeyDown += OnKey;
         SizeChanged += (_, _) => Redraw();
         SourceInitialized += (_, _) =>
         {
             WindowChrome.Place(this, shot.Monitor.X, shot.Monitor.Y, shot.Monitor.Width, shot.Monitor.Height, shot.Monitor.Scale, topmost: true, activate: false);
+            var source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+            source?.AddHook(HitTestHook);
             Opacity = 1;
             RefreshChrome();
         };
@@ -238,13 +299,43 @@ internal sealed class OverlayWindow : Window
 
     public MonitorShot Shot { get; }
 
-    public void Freeze()
+    public void Freeze(CapturePick? pick)
     {
         _frozen = true;
         _dragging = false;
+        if (IsMouseCaptured)
+            ReleaseMouseCapture();
         Cursor = Cursors.Arrow;
         _loupe.Visibility = Visibility.Collapsed;
         _hint.Visibility = Visibility.Collapsed;
+        _choiceHost.Visibility = Visibility.Collapsed;
+        long ex = NativeMethods.GetWindowLongPtr(new WindowInteropHelper(this).Handle, NativeMethods.GwlExStyle).ToInt64();
+        ex |= NativeMethods.WsExNoActivate;
+        NativeMethods.SetWindowLongPtr(new WindowInteropHelper(this).Handle, NativeMethods.GwlExStyle, new IntPtr(ex));
+        if (pick?.Image != null)
+        {
+            int x = pick.ScreenX - Shot.Monitor.X;
+            int y = pick.ScreenY - Shot.Monitor.Y;
+            if (x < Shot.Pixels.Width && y < Shot.Pixels.Height && x + pick.Image.Width > 0 && y + pick.Image.Height > 0)
+            {
+                ShowRect(Math.Max(0, x), Math.Max(0, y), pick.Image.Width, pick.Image.Height, null);
+                _selection.Visibility = Visibility.Collapsed;
+                _sizePill.Visibility = Visibility.Collapsed;
+                return;
+            }
+        }
+        RedrawHole(0, 0, 0, 0);
+    }
+
+    private IntPtr HitTestHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (_frozen && msg == NativeMethods.WmMouseActivate)
+        {
+            handled = true;
+            _session.RaiseFocusEditor();
+            return new IntPtr(NativeMethods.MaNoActivate);
+        }
+        return IntPtr.Zero;
     }
 
     public void ForceClose()
@@ -262,9 +353,11 @@ internal sealed class OverlayWindow : Window
             OverlayMode.Window => "Window    ·    Click the highlighted window    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
             OverlayMode.FullScreen => "Full screen    ·    Click to capture this monitor    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
             OverlayMode.ScrollPick => "Click the window to scroll-capture    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
-            _ => "Area    ·    Drag to select    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits"
+            _ => "Drag to draw    ·    hover snaps to a pane, tab, window, or the screen    ·    Esc cancels"
         };
         Cursor = _session.Mode == OverlayMode.Area ? Cursors.Cross : Cursors.Hand;
+        if (_session.Mode != OverlayMode.Area)
+            _choiceHost.Visibility = Visibility.Collapsed;
         if (_session.Mode == OverlayMode.FullScreen)
             ShowRect(0, 0, Shot.Pixels.Width, Shot.Pixels.Height, "This monitor");
         else if (!_dragging)
@@ -278,14 +371,15 @@ internal sealed class OverlayWindow : Window
 
     private void OnKey(object sender, KeyEventArgs e)
     {
-        if (_frozen)
-            return;
         if (e.Key == Key.Escape)
         {
-            _session.Complete(null);
+            _session.Dismiss();
             e.Handled = true;
+            return;
         }
-        else if (e.Key == Key.Space && _session.Purpose == OverlayPurpose.Edit)
+        if (_frozen)
+            return;
+        if (e.Key == Key.Space && _session.Purpose == OverlayPurpose.Edit)
         {
             var next = _session.Mode switch
             {
@@ -301,6 +395,29 @@ internal sealed class OverlayWindow : Window
             FinishFull();
             e.Handled = true;
         }
+        else if (e.Key == Key.Enter && _session.Mode == OverlayMode.Area && _snaps.Count > 0)
+        {
+            CaptureSnap(_snaps[_snapIndex]);
+            e.Handled = true;
+        }
+        else if (_session.Mode == OverlayMode.Area && e.Key is Key.Up or Key.Down)
+        {
+            CycleSnap(e.Key == Key.Up ? 1 : -1);
+            e.Handled = true;
+        }
+    }
+
+    private void OnWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (_frozen || _dragging || _session.Mode != OverlayMode.Area)
+            return;
+        e.Handled = true;
+        if (_snaps.Count == 0)
+        {
+            var (x, y) = ToPixel(Mouse.GetPosition(this));
+            OfferSnaps(x, y);
+        }
+        CycleSnap(e.Delta > 0 ? 1 : -1);
     }
 
     private void OnDown(object sender, MouseButtonEventArgs e)
@@ -311,6 +428,7 @@ internal sealed class OverlayWindow : Window
         if (_session.Mode == OverlayMode.Area)
         {
             _dragging = true;
+            _dragMoved = false;
             _startX = x;
             _startY = y;
             CaptureMouse();
@@ -341,8 +459,19 @@ internal sealed class OverlayWindow : Window
         var (x, y) = ToPixel(e.GetPosition(this));
         if (_session.Mode == OverlayMode.Area && _dragging)
         {
-            ShowRect(Math.Min(_startX, x), Math.Min(_startY, y), Math.Abs(x - _startX), Math.Abs(y - _startY), null);
-            UpdateLoupe(x, y);
+            if (Math.Abs(x - _startX) > 6 || Math.Abs(y - _startY) > 6)
+                _dragMoved = true;
+            if (_dragMoved)
+            {
+                _choiceHost.Visibility = Visibility.Collapsed;
+                ShowRect(Math.Min(_startX, x), Math.Min(_startY, y), Math.Abs(x - _startX), Math.Abs(y - _startY), null);
+                UpdateLoupe(x, y);
+            }
+            return;
+        }
+        if (_session.Mode == OverlayMode.Area)
+        {
+            OfferSnaps(x, y);
             return;
         }
         if (_session.Mode is OverlayMode.Window or OverlayMode.ScrollPick)
@@ -370,6 +499,16 @@ internal sealed class OverlayWindow : Window
         if (IsMouseCaptured)
             ReleaseMouseCapture();
         _loupe.Visibility = Visibility.Collapsed;
+        if (!_dragMoved)
+        {
+            if (_snaps.Count == 0)
+                OfferSnaps(_startX, _startY);
+            if (_snapIndex >= 0 && _snapIndex < _snaps.Count)
+            {
+                CaptureSnap(_snaps[_snapIndex]);
+                return;
+            }
+        }
         if (_selW < 4 || _selH < 4)
         {
             RefreshChrome();
@@ -408,6 +547,150 @@ internal sealed class OverlayWindow : Window
             Image = Shot.Pixels.Clone(),
             ScreenX = Shot.Monitor.X,
             ScreenY = Shot.Monitor.Y,
+            Monitor = Shot.Monitor
+        });
+    }
+
+    private void OfferSnaps(int pixelX, int pixelY)
+    {
+        int sx = Shot.Monitor.X + Math.Clamp(pixelX, 0, Math.Max(0, Shot.Pixels.Width - 1));
+        int sy = Shot.Monitor.Y + Math.Clamp(pixelY, 0, Math.Max(0, Shot.Pixels.Height - 1));
+        var found = SnapFinder.At(sx, sy, Shot.Monitor).ToList();
+        if (found.Count == 0)
+            return;
+        bool same = found.Count == _snaps.Count;
+        if (same)
+        {
+            for (int i = 0; i < found.Count; i++)
+            {
+                if (found[i].X != _snaps[i].X || found[i].Y != _snaps[i].Y || found[i].Width != _snaps[i].Width || found[i].Height != _snaps[i].Height || found[i].Kind != _snaps[i].Kind)
+                {
+                    same = false;
+                    break;
+                }
+            }
+        }
+        _snaps = found;
+        _snapIndex = _preferFromEnd == int.MaxValue
+            ? 0
+            : Math.Clamp(found.Count - 1 - _preferFromEnd, 0, found.Count - 1);
+        if (!same)
+            RebuildChoices();
+        else
+            MarkChips();
+        HighlightSnap();
+    }
+
+    private void CycleSnap(int delta)
+    {
+        if (_snaps.Count == 0)
+            return;
+        _snapIndex = Math.Clamp(_snapIndex + delta, 0, _snaps.Count - 1);
+        _preferFromEnd = _snaps.Count - 1 - _snapIndex;
+        MarkChips();
+        HighlightSnap();
+    }
+
+    private void RebuildChoices()
+    {
+        _choiceRows.Children.Clear();
+        _choiceChips.Clear();
+        for (int i = 0; i < _snaps.Count; i++)
+        {
+            int index = i;
+            var chip = new Border
+            {
+                CornerRadius = new CornerRadius(7),
+                Padding = new Thickness(10, 6, 10, 6),
+                Margin = new Thickness(6, 2, 6, 2),
+                Cursor = Cursors.Hand,
+                Child = new TextBlock
+                {
+                    Text = _snaps[i].Line,
+                    Foreground = Palette.Text,
+                    FontFamily = Palette.Font,
+                    FontSize = 13
+                }
+            };
+            chip.MouseLeftButtonDown += (_, e) =>
+            {
+                e.Handled = true;
+                _dragging = false;
+                if (IsMouseCaptured)
+                    ReleaseMouseCapture();
+                if (index < _snaps.Count)
+                    CaptureSnap(_snaps[index]);
+            };
+            _choiceChips.Add(chip);
+            _choiceRows.Children.Add(chip);
+        }
+        MarkChips();
+        _choiceHost.Visibility = Visibility.Visible;
+    }
+
+    private void MarkChips()
+    {
+        for (int i = 0; i < _choiceChips.Count; i++)
+        {
+            bool on = i == _snapIndex;
+            _choiceChips[i].Background = on ? Palette.Elevated : Brushes.Transparent;
+            _choiceChips[i].BorderBrush = on ? Brushes.White : Brushes.Transparent;
+            _choiceChips[i].BorderThickness = new Thickness(1);
+        }
+    }
+
+    private void HighlightSnap()
+    {
+        if (_snapIndex < 0 || _snapIndex >= _snaps.Count || ActualWidth < 1)
+            return;
+        var target = _snaps[_snapIndex];
+        var local = Intersect(new NativeMethods.Rect
+        {
+            Left = target.X,
+            Top = target.Y,
+            Right = target.Right,
+            Bottom = target.Bottom
+        });
+        ShowRect(local.X, local.Y, local.Width, local.Height, target.Kind);
+        _sizePill.Visibility = Visibility.Collapsed;
+        _loupe.Visibility = Visibility.Collapsed;
+        PlaceChoices();
+    }
+
+    private void PlaceChoices()
+    {
+        _choiceHost.Measure(new Size(320, 640));
+        double hostW = Math.Max(160, _choiceHost.DesiredSize.Width);
+        double hostH = Math.Max(36, _choiceHost.DesiredSize.Height);
+        double sx = ActualWidth / Math.Max(1, Shot.Pixels.Width);
+        double sy = ActualHeight / Math.Max(1, Shot.Pixels.Height);
+        double left = (_selX + _selW) * sx + 12;
+        double top = _selY * sy;
+        if (left + hostW > ActualWidth - 8)
+            left = _selX * sx - hostW - 12;
+        if (left < 8)
+            left = 8;
+        if (top + hostH > ActualHeight - 8)
+            top = Math.Max(8, ActualHeight - hostH - 8);
+        _choiceHost.Margin = new Thickness(left, Math.Max(8, top), 0, 0);
+    }
+
+    private void CaptureSnap(SnapTarget target)
+    {
+        var local = Intersect(new NativeMethods.Rect
+        {
+            Left = target.X,
+            Top = target.Y,
+            Right = target.Right,
+            Bottom = target.Bottom
+        });
+        if (local.Width < 4 || local.Height < 4)
+            return;
+        _session.Complete(new CapturePick
+        {
+            Image = Shot.Pixels.Crop(local.X, local.Y, local.Width, local.Height),
+            ScreenX = Shot.Monitor.X + local.X,
+            ScreenY = Shot.Monitor.Y + local.Y,
             Monitor = Shot.Monitor
         });
     }

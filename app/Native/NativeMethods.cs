@@ -16,6 +16,9 @@ internal static class NativeMethods
     public const int WsThickFrame = 0x00040000;
     public const int WsExToolWindow = 0x00000080;
     public const int WsExAppWindow = 0x00040000;
+    public const int WsExNoActivate = 0x08000000;
+    public const int WmMouseActivate = 0x0021;
+    public const int MaNoActivate = 3;
     public const int MonitorDefaultToNearest = 2;
     public const int GaRoot = 2;
     public const int SwRestore = 9;
@@ -70,6 +73,8 @@ internal static class NativeMethods
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc proc, IntPtr lParam);
+    [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr hwnd, EnumWindowsProc proc, IntPtr lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr hwnd, StringBuilder name, int max);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hwnd, StringBuilder lpString, int nMax);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);

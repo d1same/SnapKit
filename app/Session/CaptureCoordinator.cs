@@ -94,8 +94,35 @@ internal sealed class CaptureCoordinator
                 OcrFlow.Start(image, message => _state.Tray?.Balloon(Brand.Name, message), null)));
             return;
         }
-        var editor = InPlaceEditorWindow.Show(pick.Image, pick.ScreenX, pick.ScreenY, pick.Monitor, _state);
-        editor.Closed += (_, _) => session.CloseAll();
+        InPlaceEditorWindow? editor = null;
+        session.Dismissed += () =>
+        {
+            try { editor?.Discard(); }
+            finally { session.CloseAll(); }
+        };
+        session.FocusEditor += () =>
+        {
+            try
+            {
+                if (editor is { IsVisible: true })
+                    editor.Activate();
+            }
+            catch
+            {
+                // The failsafe hotkey still ends the process.
+            }
+        };
+        try
+        {
+            editor = InPlaceEditorWindow.Show(pick.Image, pick.ScreenX, pick.ScreenY, pick.Monitor, _state);
+            editor.Closed += (_, _) => session.CloseAll();
+            editor.Activate();
+        }
+        catch (Exception ex)
+        {
+            session.CloseAll();
+            _state.Tray?.Balloon(Brand.Name, ex.Message);
+        }
     }
 
     private async Task FinishScroll(IntPtr hwnd)
