@@ -92,6 +92,26 @@ internal sealed class ShotSurface : Grid
         Document.RemoveAnnotation(id);
     }
 
+    public void RestyleSelection(string? color, double? stroke, double? font)
+    {
+        if (_editing != null && _editIsNew)
+        {
+            ApplyLive(_editing, color, stroke, font);
+            RefreshEditorInk();
+            PositionTextBox();
+            _paint.InvalidateVisual();
+            return;
+        }
+
+        var id = _selected ?? _editing?.Id;
+        if (id == null)
+            return;
+        if (!Document.Restyle(id.Value, color, stroke, font))
+            return;
+        RefreshEditorInk();
+        PositionTextBox();
+    }
+
     private void OnDocumentChanged()
     {
         Width = Math.Max(1, Document.View.Width / PixelScale);
@@ -300,11 +320,9 @@ internal sealed class ShotSurface : Grid
         _box!.Text = isNew && annotation.Kind == AnnotationKind.Callout && string.IsNullOrEmpty(annotation.Text)
             ? "Note"
             : annotation.Text;
-        bool lightInk = annotation.Kind == AnnotationKind.Callout && !ShapeMath.IsDark(annotation.ColorHex);
-        _box.Foreground = lightInk ? Palette.Ink : Palette.Brush(annotation.ColorHex);
-        _box.FontSize = Math.Max(10, annotation.FontSize / PixelScale);
         _box.FontWeight = FontWeights.Normal;
         _box.Visibility = Visibility.Visible;
+        RefreshEditorInk();
         PositionTextBox();
         _paint.InvalidateVisual();
         Dispatcher.BeginInvoke(() =>
@@ -378,9 +396,9 @@ internal sealed class ShotSurface : Grid
         if (_editing.Kind == AnnotationKind.Callout && _editing.Points.Count > 0)
         {
             var bubble = AnnotationPainter.Bubble(_editing, out _);
-            Canvas.SetLeft(_box, (bubble.X - Document.View.X) / PixelScale + 8);
-            Canvas.SetTop(_box, (bubble.Y - Document.View.Y) / PixelScale + 6);
-            _box.Width = Math.Max(40, bubble.Width / PixelScale - 16);
+            Canvas.SetLeft(_box, (bubble.X - Document.View.X + 10) / PixelScale);
+            Canvas.SetTop(_box, (bubble.Y - Document.View.Y + 6) / PixelScale);
+            _box.Width = Math.Max(24, (bubble.Width - 20) / PixelScale);
             return;
         }
         if (_editing.Points.Count == 0)
@@ -410,6 +428,28 @@ internal sealed class ShotSurface : Grid
         Stroke = StrokeWidth,
         FontSize = FontSize
     };
+
+    private void RefreshEditorInk()
+    {
+        if (_box == null || _editing == null || _box.Visibility != Visibility.Visible)
+            return;
+        var ink = _editing.Kind == AnnotationKind.Callout
+            ? (ShapeMath.IsDark(_editing.ColorHex) ? Brushes.White : Palette.Ink)
+            : Palette.Brush(_editing.ColorHex);
+        _box.Foreground = ink;
+        _box.CaretBrush = ink;
+        _box.FontSize = Math.Max(10, _editing.FontSize / PixelScale);
+    }
+
+    private static void ApplyLive(Annotation mark, string? color, double? stroke, double? font)
+    {
+        if (color != null && mark.Kind != AnnotationKind.Blur)
+            mark.ColorHex = HexColor.Normalize(color, mark.ColorHex);
+        if (stroke != null && mark.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur)
+            mark.Stroke = Math.Clamp(stroke.Value, 1, 16);
+        if (font != null && mark.Kind is AnnotationKind.Text or AnnotationKind.Callout or AnnotationKind.Number)
+            mark.FontSize = Math.Clamp(font.Value, 8, 72);
+    }
 
     private PointD ToSource(Point dip) => new(dip.X * PixelScale + Document.View.X, dip.Y * PixelScale + Document.View.Y);
 
@@ -442,11 +482,17 @@ internal sealed class ShotSurface : Grid
 
     private static bool Hits(Annotation annotation, PointD point)
     {
+        if (annotation.Kind == AnnotationKind.Callout)
+        {
+            var bubble = AnnotationPainter.Bubble(annotation, out _);
+            bubble.Inflate(6, 6);
+            if (bubble.Contains(point.X, point.Y))
+                return true;
+            return annotation.Points.Count > 0 && double.Hypot(annotation.Points[0].X - point.X, annotation.Points[0].Y - point.Y) <= 14;
+        }
         if (annotation.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Highlighter)
             return Distance(annotation.Points, point) <= Math.Max(8, (annotation.Kind == AnnotationKind.Highlighter ? annotation.Stroke * 4 : annotation.Stroke) + 4);
-        var rect = annotation.Kind == AnnotationKind.Callout
-            ? AnnotationPainter.Bubble(annotation, out _)
-            : AnnotationPainter.Box(annotation);
+        var rect = AnnotationPainter.Box(annotation);
         if (annotation.Kind == AnnotationKind.Text)
             rect = new Rect(rect.X, rect.Y, Math.Max(rect.Width, Math.Max(24, annotation.Text.Length * annotation.FontSize * 0.55)), Math.Max(rect.Height, annotation.FontSize * 1.4));
         rect.Inflate(6, 6);

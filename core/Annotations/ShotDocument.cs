@@ -38,6 +38,39 @@ public sealed class ShotDocument
 
     public void RemoveAnnotation(Guid id) => Commit(() => _annotations.RemoveAll(a => a.Id == id));
 
+    public bool Restyle(Guid id, string? colorHex, double? stroke, double? fontSize)
+    {
+        var mark = _annotations.FirstOrDefault(item => item.Id == id);
+        if (mark == null)
+            return false;
+
+        bool useColor = colorHex != null && mark.Kind != AnnotationKind.Blur;
+        bool useStroke = stroke != null && mark.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur;
+        bool useFont = fontSize != null && mark.Kind is AnnotationKind.Text or AnnotationKind.Callout or AnnotationKind.Number;
+        string? nextColor = useColor ? HexColor.Normalize(colorHex, mark.ColorHex) : null;
+        if (nextColor == mark.ColorHex)
+            nextColor = null;
+        double? nextStroke = useStroke ? Math.Clamp(stroke!.Value, 1, 16) : null;
+        if (nextStroke != null && Math.Abs(nextStroke.Value - mark.Stroke) < 0.01)
+            nextStroke = null;
+        double? nextFont = useFont ? Math.Clamp(fontSize!.Value, 8, 72) : null;
+        if (nextFont != null && Math.Abs(nextFont.Value - mark.FontSize) < 0.01)
+            nextFont = null;
+        if (nextColor == null && nextStroke == null && nextFont == null)
+            return false;
+
+        Commit(() =>
+        {
+            if (nextColor != null)
+                mark.ColorHex = nextColor;
+            if (nextStroke != null)
+                mark.Stroke = nextStroke.Value;
+            if (nextFont != null)
+                mark.FontSize = nextFont.Value;
+        });
+        return true;
+    }
+
     public void UpdateText(Guid id, string text)
     {
         var annotation = _annotations.FirstOrDefault(a => a.Id == id);

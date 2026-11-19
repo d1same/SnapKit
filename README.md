@@ -8,9 +8,9 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://qu.ax/stt0F)
+[SnapKit-win-x64.zip](https://qu.ax/x7Tq2)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 10:47 PM ET**. Unzip it and run `SnapKit.exe` once.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 11:00 PM ET**. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens in the tray. Running a newer zip closes whatever SnapKit is already running and replaces it.
 
@@ -83,7 +83,9 @@ Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` 
 
 **Pin** floats the picture always-on-top. Drag it. Right-click and choose **Copy**, or double-click, or press `Ctrl+C`. `Ctrl+S` saves it. `Esc` closes it.
 
-OCR reads the capture on the PC, then highlights each word on the picture. Drag across the words you want and that text is copied. `Ctrl+A` copies all of it. `Esc` closes the highlighter and leaves the capture editable. If OCR fails, the message stays in a small window with **Copy error**. OCR uses the Windows language already installed. No cloud.
+OCR reads the capture on the PC, then highlights each word on the picture. The highlight sits on the word at 100%, 125%, 150%, and 200% scaling, including a monitor that is not at the top-left of the desktop. Drag across the words you want and that text is copied in reading order. `Ctrl+A` copies all of it. `Esc` closes the highlighter and leaves the capture editable. If OCR fails, the message stays in a small window with **Copy error**. OCR uses the Windows language already installed. No cloud.
+
+The color row and the hex box apply to the pen, line, arrow, rectangle, ellipse, highlighter, text, callout, step number, and spotlight. A selected mark changes with them. Stroke width changes the pen, line, arrow, shapes, highlighter, and blur. Text size changes text, callouts, and step numbers. Blur stays a pixelate; it has no tint.
 
 ### Global shortcuts
 
@@ -138,4 +140,4 @@ GIF and MP4 recording is left for v2. The hook is `IScreenRecorder` in `app/Capt
 - Cross-monitor drag is not supported.
 - After you finish a selection, that screen stays dimmed with the shot sitting on the spot you captured. The toolbar is next to the shot. `Esc` closes both.
 - `Ctrl+Alt+Shift+Esc` and the tray **Exit** command end the process from outside the window that draws the capture.
-- This build was compiled and unit-tested here. The window, hotkeys, OCR, and install were not run on a Windows desktop. OCR now decodes a PNG through the Windows runtime instead of casting a COM buffer.
+- This build was compiled and unit-tested here. The window, hotkeys, OCR, and install were not run on a Windows desktop. Word boxes are mapped from the bitmap Windows OCR actually saw, then onto the picture at the display scale.

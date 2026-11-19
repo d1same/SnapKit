@@ -11,7 +11,7 @@ internal sealed class ToolbarView : Border
     private readonly Dictionary<EditorTool, Border> _tools = new();
     private readonly Dictionary<string, Border> _swatches = new();
     private readonly Dictionary<double, Border> _sizes = new();
-    private readonly TextBlock _hex;
+    private readonly TextBox _hex;
     private readonly TextBlock _font;
     private readonly TextBlock _hint;
     private readonly Border _undo;
@@ -75,15 +75,32 @@ internal sealed class ToolbarView : Border
             options.Children.Add(dot);
         }
 
-        _hex = new TextBlock
+        _hex = new TextBox
         {
             Text = "#FF3B30",
+            Width = 74,
+            Height = 22,
+            Margin = new Thickness(6, 0, 8, 0),
+            Background = Brushes.Transparent,
             Foreground = Palette.Text,
+            BorderThickness = new Thickness(0),
             FontFamily = Palette.Mono,
             FontSize = 12,
+            CaretBrush = Brushes.White,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(6, 0, 8, 0)
+            VerticalContentAlignment = VerticalAlignment.Center,
+            MaxLength = 7,
+            ToolTip = "Type a hex color. It recolors the selected mark and the next one."
         };
+        _hex.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter)
+                return;
+            CommitHex();
+            Keyboard.ClearFocus();
+            e.Handled = true;
+        };
+        _hex.LostKeyboardFocus += (_, _) => CommitHex();
         options.Children.Add(_hex);
 
         foreach (var size in new[] { 2d, 3d, 5d, 8d, 12d })
@@ -159,7 +176,8 @@ internal sealed class ToolbarView : Border
     public void Sync(EditorSession session)
     {
         _sync = true;
-        _hex.Text = session.ColorHex;
+        if (!_hex.IsKeyboardFocusWithin)
+            _hex.Text = session.ColorHex;
         _font.Text = session.FontSize.ToString("0");
         _hint.Text = session.Status;
         HighlightTool(session.Tool);
@@ -168,6 +186,13 @@ internal sealed class ToolbarView : Border
         _undo.Opacity = session.Document.CanUndo ? 1 : 0.35;
         _redo.Opacity = session.Document.CanRedo ? 1 : 0.35;
         _sync = false;
+    }
+
+    private void CommitHex()
+    {
+        if (_sync)
+            return;
+        ColorPicked?.Invoke(_hex.Text);
     }
 
     private void CycleFont()

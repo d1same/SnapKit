@@ -18,6 +18,7 @@ internal sealed class OcrSelectWindow : Window
 
     private readonly PixelBuffer _image;
     private readonly OcrPage _page;
+    private readonly Image _picture;
     private readonly Canvas _marks;
     private readonly TextBlock _status;
     private readonly List<Border> _boxes = new();
@@ -27,8 +28,8 @@ internal sealed class OcrSelectWindow : Window
     private bool _moved;
     private Point _start;
     private int _hover = -1;
-    private double _fit = 1;
     private double _builtWidth;
+    private double _builtHeight;
 
     public OcrSelectWindow(PixelBuffer image, OcrPage page)
     {
@@ -43,16 +44,29 @@ internal sealed class OcrSelectWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
         ShowActivated = true;
 
-        var picture = new Image
+        _picture = new Image
         {
             Source = BitmapConvert.ToBitmapSource(image),
             Stretch = Stretch.Fill,
             IsHitTestVisible = false,
+            SnapsToDevicePixels = true,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        RenderOptions.SetBitmapScalingMode(_picture, BitmapScalingMode.NearestNeighbor);
+        _marks = new Canvas
+        {
+            Background = Brushes.Transparent,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
             SnapsToDevicePixels = true
         };
-        RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.NearestNeighbor);
-        _marks = new Canvas { Background = Brushes.Transparent };
-        var stage = new Grid { Children = { picture, _marks } };
+        var stage = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Children = { _picture, _marks }
+        };
         stage.MouseLeftButtonDown += OnDown;
         stage.MouseMove += OnMove;
         stage.MouseLeftButtonUp += OnUp;
@@ -110,40 +124,47 @@ internal sealed class OcrSelectWindow : Window
         int bar = (int)Math.Ceiling(52 * scale);
         int maxW = Math.Max(240, monitor.Width - 80);
         int maxH = Math.Max(160, monitor.Height - bar - 80);
-        _fit = Math.Min(1, Math.Min(maxW / (double)Math.Max(1, _image.Width), maxH / (double)Math.Max(1, _image.Height)));
-        if (double.IsNaN(_fit) || _fit <= 0)
-            _fit = 1;
-        int viewW = Math.Max(1, (int)Math.Round(_image.Width * _fit));
-        int viewH = Math.Max(1, (int)Math.Round(_image.Height * _fit));
+        double fit = Math.Min(1, Math.Min(maxW / (double)Math.Max(1, _image.Width), maxH / (double)Math.Max(1, _image.Height)));
+        if (double.IsNaN(fit) || fit <= 0)
+            fit = 1;
+        int viewW = Math.Max(1, (int)Math.Round(_image.Width * fit));
+        int viewH = Math.Max(1, (int)Math.Round(_image.Height * fit));
+        double dipW = viewW / scale;
+        double dipH = viewH / scale;
+        _picture.Width = dipW;
+        _picture.Height = dipH;
+        _marks.Width = dipW;
+        _marks.Height = dipH;
         int x = monitor.X + Math.Max(0, (monitor.Width - viewW) / 2);
         int y = monitor.Y + Math.Max(0, (monitor.Height - viewH - bar) / 2);
         WindowChrome.Place(this, x, y, viewW, viewH + bar, scale, topmost: true, activate: true, inTaskbar: true);
+        BuildMarks();
     }
 
     private void BuildMarks()
     {
-        if (_marks.ActualWidth < 1 || _image.Width < 1)
+        if (double.IsNaN(_marks.Width) || double.IsNaN(_marks.Height) || _marks.Width < 1 || _marks.Height < 1 || _image.Width < 1)
             return;
-        if (_boxes.Count == _page.Words.Count && Math.Abs(_builtWidth - _marks.ActualWidth) < 0.5)
+        if (_boxes.Count == _page.Words.Count && Math.Abs(_builtWidth - _marks.Width) < 0.5 && Math.Abs(_builtHeight - _marks.Height) < 0.5)
             return;
-        _builtWidth = _marks.ActualWidth;
+        _builtWidth = _marks.Width;
+        _builtHeight = _marks.Height;
         _marks.Children.Clear();
         _boxes.Clear();
-        double sx = _marks.ActualWidth / _image.Width;
-        double sy = _marks.ActualHeight / _image.Height;
         for (int i = 0; i < _page.Words.Count; i++)
         {
             var word = _page.Words[i];
+            var placed = OcrMap.ToView(new OcrBox(word.X, word.Y, word.Width, word.Height), _image.Width, _image.Height, _marks.Width, _marks.Height, 0, 0);
             var box = new Border
             {
-                Width = Math.Max(2, word.Width * sx),
-                Height = Math.Max(2, word.Height * sy),
+                Width = Math.Max(2, placed.Width),
+                Height = Math.Max(2, placed.Height),
                 Background = Idle,
                 CornerRadius = new CornerRadius(2),
                 IsHitTestVisible = false
             };
-            Canvas.SetLeft(box, word.X * sx);
-            Canvas.SetTop(box, word.Y * sy);
+            Canvas.SetLeft(box, placed.X);
+            Canvas.SetTop(box, placed.Y);
             _marks.Children.Add(box);
             _boxes.Add(box);
         }
@@ -246,7 +267,8 @@ internal sealed class OcrSelectWindow : Window
         double x2 = Math.Max(a.X, b.X);
         double y2 = Math.Max(a.Y, b.Y);
         ShowBand(x1, y1, x2 - x1, y2 - y1);
-        var (ix, iy, iw, ih) = ToImage(x1, y1, x2 - x1, y2 - y1);
+        var hit = OcrMap.FromView(new OcrBox(x1, y1, x2 - x1, y2 - y1), _image.Width, _image.Height, Math.Max(1, _marks.Width), Math.Max(1, _marks.Height), 0, 0);
+        double ix = hit.X, iy = hit.Y, iw = hit.Width, ih = hit.Height;
         _selected.Clear();
         for (int i = 0; i < _page.Words.Count; i++)
         {
@@ -258,7 +280,8 @@ internal sealed class OcrSelectWindow : Window
 
     private int WordAt(Point point)
     {
-        var (x, y, _, _) = ToImage(point.X, point.Y, 0, 0);
+        var mapped = OcrMap.FromView(new OcrBox(point.X, point.Y, 0, 0), _image.Width, _image.Height, Math.Max(1, _marks.Width), Math.Max(1, _marks.Height), 0, 0);
+        double x = mapped.X, y = mapped.Y;
         int best = -1;
         double bestArea = double.MaxValue;
         for (int i = 0; i < _page.Words.Count; i++)
@@ -274,13 +297,6 @@ internal sealed class OcrSelectWindow : Window
             }
         }
         return best;
-    }
-
-    private (double X, double Y, double W, double H) ToImage(double x, double y, double w, double h)
-    {
-        double sx = _image.Width / Math.Max(1, _marks.ActualWidth);
-        double sy = _image.Height / Math.Max(1, _marks.ActualHeight);
-        return (x * sx, y * sy, w * sx, h * sy);
     }
 
     private void Paint()

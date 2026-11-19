@@ -59,16 +59,16 @@ internal static class AnnotationPainter
             return;
         var view = new Rect(document.View.X, document.View.Y, document.View.Width, document.View.Height);
         var dim = new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(view), new RectangleGeometry(hole));
-        dc.DrawGeometry(Palette.Freeze(0, 0, 0, 0x8C), null, dim);
+        dc.DrawGeometry(Palette.Brush(spot.ColorHex, 0x8C), null, dim);
     }
 
     public static Rect Bubble(Annotation annotation, out FormattedText text)
     {
         var anchor = annotation.Points.Count > 1 ? P(annotation.Points[1]) : new Point(P(annotation.Points[0]).X + 28, P(annotation.Points[0]).Y - 48);
         string value = string.IsNullOrWhiteSpace(annotation.Text) ? "Note" : annotation.Text;
-        text = Formatted(value, annotation.FontSize, Brushes.White, 240, bold: false);
-        double width = Math.Max(92, text.Width + 22);
-        double height = text.Height + 18;
+        text = Formatted(value, annotation.FontSize, Brushes.White, 280, bold: false);
+        double width = Math.Max(28, text.Width + 20);
+        double height = text.Height + 14;
         return new Rect(anchor.X - width / 2, anchor.Y - height / 2, width, height);
     }
 
@@ -76,16 +76,18 @@ internal static class AnnotationPainter
     {
         if (string.IsNullOrEmpty(annotation.Text))
             return;
-        var text = Formatted(annotation.Text, annotation.FontSize, Palette.Brush(annotation.ColorHex), 520, bold: false);
-        dc.DrawText(text, P(annotation.Points[0]));
+        var origin = P(annotation.Points[0]);
+        var halo = Formatted(annotation.Text, annotation.FontSize, Contrast(annotation.ColorHex), 520, bold: false);
+        foreach (var (dx, dy) in new[] { (-1d, 0d), (1d, 0d), (0d, -1d), (0d, 1d) })
+            dc.DrawText(halo, new Point(origin.X + dx, origin.Y + dy));
+        dc.DrawText(Formatted(annotation.Text, annotation.FontSize, Palette.Brush(annotation.ColorHex), 520, bold: false), origin);
     }
 
     private static void DrawCallout(DrawingContext dc, Annotation annotation, bool hideText)
     {
         var bubble = Bubble(annotation, out var text);
         var fill = Palette.Brush(annotation.ColorHex);
-        var ink = ShapeMath.IsDark(annotation.ColorHex) ? Brushes.White : Palette.Ink;
-        text.SetForegroundBrush(ink);
+        text.SetForegroundBrush(Contrast(annotation.ColorHex));
         var tip = P(annotation.Points[0]);
         var edge = Edge(bubble, tip);
         double dx = tip.X - edge.X;
@@ -99,24 +101,27 @@ internal static class AnnotationPainter
             using (var ctx = geo.Open())
             {
                 ctx.BeginFigure(tip, true, true);
-                ctx.LineTo(new Point(edge.X + nx * 8, edge.Y + ny * 8), true, false);
-                ctx.LineTo(new Point(edge.X - nx * 8, edge.Y - ny * 8), true, false);
+                ctx.LineTo(new Point(edge.X + nx * 7, edge.Y + ny * 7), true, false);
+                ctx.LineTo(new Point(edge.X - nx * 7, edge.Y - ny * 7), true, false);
             }
             geo.Freeze();
             dc.DrawGeometry(fill, null, geo);
         }
-        dc.DrawRoundedRectangle(fill, null, bubble, 8, 8);
+        var outline = new Pen(Contrast(annotation.ColorHex), 1);
+        outline.Freeze();
+        dc.DrawRoundedRectangle(fill, outline, bubble, 7, 7);
         if (!hideText)
-            dc.DrawText(text, new Point(bubble.X + 11, bubble.Y + 8));
+            dc.DrawText(text, new Point(bubble.X + 10, bubble.Y + 6));
     }
 
     private static void DrawNumber(DrawingContext dc, Annotation annotation, SolidColorBrush fill)
     {
         var center = P(annotation.Points[0]);
         double radius = Math.Max(12, annotation.FontSize * 0.72);
-        dc.DrawEllipse(fill, null, center, radius, radius);
-        var ink = ShapeMath.IsDark(annotation.ColorHex) ? Brushes.White : Palette.Ink;
-        var text = Formatted(annotation.Number.ToString(), annotation.FontSize * 0.82, ink, 40, bold: true);
+        var ring = new Pen(Contrast(annotation.ColorHex), 1.25);
+        ring.Freeze();
+        dc.DrawEllipse(fill, ring, center, radius, radius);
+        var text = Formatted(annotation.Number.ToString(), annotation.FontSize * 0.82, Contrast(annotation.ColorHex), 40, bold: true);
         dc.DrawText(text, new Point(center.X - text.Width / 2, center.Y - text.Height / 2 - 0.5));
     }
 
@@ -126,10 +131,11 @@ internal static class AnnotationPainter
             return;
         var start = annotation.Points[0];
         var end = annotation.Points[1];
-        double head = Math.Max(12, annotation.Stroke * 4);
+        double head = Math.Max(11, annotation.Stroke * 3.6);
         var (left, right) = ShapeMath.ArrowHead(start, end, head);
         var neck = new PointD((left.X + right.X) / 2, (left.Y + right.Y) / 2);
-        dc.DrawLine(Pen(annotation, 255), P(start), P(neck));
+        var into = new PointD(neck.X + (end.X - neck.X) * 0.45, neck.Y + (end.Y - neck.Y) * 0.45);
+        dc.DrawLine(Pen(annotation, 255), P(start), P(into));
         var geo = new StreamGeometry();
         using (var ctx = geo.Open())
         {
@@ -205,6 +211,8 @@ internal static class AnnotationPainter
         double scale = Math.Min(scaleX, scaleY);
         return new Point(center.X + dx * scale, center.Y + dy * scale);
     }
+
+    private static Brush Contrast(string hex) => ShapeMath.IsDark(hex) ? Brushes.White : Palette.Ink;
 
     private static Point P(PointD point) => new(point.X, point.Y);
 }

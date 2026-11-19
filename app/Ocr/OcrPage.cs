@@ -25,7 +25,7 @@ internal sealed class OcrToken
         return X < right && Right > x && Y < bottom && Bottom > y;
     }
 
-    public OcrPiece Piece => new(Line, Text, LineText, WordsInLine);
+    public OcrPiece Piece => new(Line, Text, LineText, WordsInLine, X, Y);
 }
 
 internal sealed class OcrPage

@@ -1,8 +1,7 @@
-using System.IO;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
+using Windows.Security.Cryptography;
 using Windows.Storage.Streams;
 
 namespace SnapKit;
@@ -62,10 +61,8 @@ internal static class OcrClient
         }
 
         working.ForceOpaque();
-        using var bitmap = await LoadSoftwareBitmap(working);
+        using var bitmap = CopySoftwareBitmap(working);
         var result = await engine.RecognizeAsync(bitmap);
-        double scaleX = source.Width / (double)Math.Max(1, working.Width);
-        double scaleY = source.Height / (double)Math.Max(1, working.Height);
         var words = new List<OcrToken>();
         if (result?.Lines != null)
         {
@@ -81,16 +78,22 @@ internal static class OcrClient
                         var bounds = word.BoundingRect;
                         if (bounds.Width < 1 || bounds.Height < 1 || string.IsNullOrWhiteSpace(word.Text))
                             continue;
+                        var mapped = OcrMap.ToImagePixels(
+                            new OcrBox(bounds.X, bounds.Y, bounds.Width, bounds.Height),
+                            bitmap.PixelWidth,
+                            bitmap.PixelHeight,
+                            source.Width,
+                            source.Height);
                         words.Add(new OcrToken
                         {
                             Text = word.Text.Trim(),
                             Line = lineIndex,
                             LineText = lineText,
                             WordsInLine = count,
-                            X = bounds.X * scaleX,
-                            Y = bounds.Y * scaleY,
-                            Width = bounds.Width * scaleX,
-                            Height = bounds.Height * scaleY
+                            X = mapped.X,
+                            Y = mapped.Y,
+                            Width = mapped.Width,
+                            Height = mapped.Height
                         });
                     }
                 }
@@ -105,26 +108,17 @@ internal static class OcrClient
         };
     }
 
-    private static async Task<SoftwareBitmap> LoadSoftwareBitmap(PixelBuffer source)
+    private static SoftwareBitmap CopySoftwareBitmap(PixelBuffer source)
     {
-        var png = EncodePng(source);
-        using var stream = new InMemoryRandomAccessStream();
-        var writer = new DataWriter(stream);
-        writer.WriteBytes(png);
-        await writer.StoreAsync();
-        writer.DetachStream();
-        writer.Dispose();
-        stream.Seek(0);
-        var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
-        return await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
-    }
-
-    private static byte[] EncodePng(PixelBuffer source)
-    {
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(BitmapConvert.ToBitmapSource(source)));
-        using var memory = new MemoryStream();
-        encoder.Save(memory);
-        return memory.ToArray();
+        int count = source.Width * source.Height * 4;
+        var bytes = new byte[count];
+        System.Buffer.BlockCopy(source.Pixels, 0, bytes, 0, count);
+        IBuffer buffer = CryptographicBuffer.CreateFromByteArray(bytes);
+        return SoftwareBitmap.CreateCopyFromBuffer(
+            buffer,
+            BitmapPixelFormat.Bgra8,
+            source.Width,
+            source.Height,
+            BitmapAlphaMode.Premultiplied);
     }
 }

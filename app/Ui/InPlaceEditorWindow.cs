@@ -85,16 +85,19 @@ internal sealed class InPlaceEditorWindow : Window
         {
             _session.SetColor(hex);
             _surface.ColorHex = _session.ColorHex;
+            _surface.RestyleSelection(_session.ColorHex, null, null);
         };
         _toolbar.StrokePicked += size =>
         {
             _session.SetStroke(size);
             _surface.StrokeWidth = _session.Stroke;
+            _surface.RestyleSelection(null, _session.Stroke, null);
         };
         _toolbar.FontPicked += size =>
         {
             _session.SetFontSize(size);
             _surface.FontSize = size;
+            _surface.RestyleSelection(null, null, size);
         };
         _surface.ColorPicked += hex =>
         {

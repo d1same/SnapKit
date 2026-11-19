@@ -77,6 +77,50 @@ public class DocumentTests
     }
 
     [Fact]
+    public void Restyle_changes_color_stroke_and_font_for_the_mark()
+    {
+        var doc = new ShotDocument(new PixelBuffer(40, 40));
+        doc.AddAnnotation(new Annotation
+        {
+            Kind = AnnotationKind.Arrow,
+            ColorHex = "#FF3B30",
+            Stroke = 3,
+            Points = { new PointD(1, 1), new PointD(10, 8) }
+        });
+        doc.AddAnnotation(new Annotation
+        {
+            Kind = AnnotationKind.Callout,
+            ColorHex = "#1C1C1E",
+            FontSize = 18,
+            Text = "Note",
+            Points = { new PointD(2, 2), new PointD(12, 12) }
+        });
+        doc.AddAnnotation(new Annotation
+        {
+            Kind = AnnotationKind.Blur,
+            ColorHex = "#FF3B30",
+            Stroke = 4,
+            Points = { new PointD(0, 0), new PointD(8, 8) }
+        });
+
+        Assert.True(doc.Restyle(doc.Annotations[0].Id, "#0A84FF", 8, 32));
+        Assert.Equal("#0A84FF", doc.Annotations[0].ColorHex);
+        Assert.Equal(8, doc.Annotations[0].Stroke);
+
+        Assert.True(doc.Restyle(doc.Annotations[1].Id, "#FFE14A", 12, 24));
+        Assert.Equal("#FFE14A", doc.Annotations[1].ColorHex);
+        Assert.Equal(3, doc.Annotations[1].Stroke);
+        Assert.Equal(24, doc.Annotations[1].FontSize);
+
+        Assert.True(doc.Restyle(doc.Annotations[2].Id, "#30D158", 6, 40));
+        Assert.Equal("#FF3B30", doc.Annotations[2].ColorHex);
+        Assert.Equal(6, doc.Annotations[2].Stroke);
+
+        doc.Undo();
+        Assert.Equal(4, doc.Annotations[2].Stroke);
+    }
+
+    [Fact]
     public void Arrow_head_spreads()
     {
         var (left, right) = ShapeMath.ArrowHead(new PointD(0, 0), new PointD(40, 0), 12);
