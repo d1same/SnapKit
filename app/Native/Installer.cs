@@ -29,14 +29,11 @@ internal static class Installer
             return;
 
         Directory.CreateDirectory(DirectoryPath);
-        try
-        {
-            File.Copy(current, ExePath, overwrite: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        StopOtherCopies();
+        if (!TryReplace(current, ExePath))
         {
             System.Windows.MessageBox.Show(
-                Brand.Name + " is already installed and running. Exit it from the tray icon, then run this file again to update.",
+                "The installed " + Brand.Name + " file is still locked. End " + Brand.Name + " in Task Manager, then run this file again.",
                 Brand.Name,
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);
@@ -72,12 +69,7 @@ internal static class Installer
 
         try { if (File.Exists(ShortcutPath)) File.Delete(ShortcutPath); } catch { /* shortcut in use */ }
 
-        foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(ExePath)))
-        {
-            if (process.Id == Environment.ProcessId)
-                continue;
-            try { process.Kill(entireProcessTree: true); } catch { /* already exiting */ }
-        }
+        StopOtherCopies();
 
         if (!Directory.Exists(DirectoryPath))
             return;
@@ -90,6 +82,49 @@ internal static class Installer
             UseShellExecute = false,
             WindowStyle = ProcessWindowStyle.Hidden
         });
+    }
+
+    private static bool TryReplace(string source, string destination)
+    {
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            try
+            {
+                if (File.Exists(destination))
+                    File.SetAttributes(destination, FileAttributes.Normal);
+                File.Copy(source, destination, overwrite: true);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                StopOtherCopies();
+                Thread.Sleep(300);
+            }
+        }
+        return false;
+    }
+
+    private static void StopOtherCopies()
+    {
+        string name = Path.GetFileNameWithoutExtension(ExePath);
+        foreach (var process in Process.GetProcessesByName(name))
+        {
+            try
+            {
+                if (process.Id == Environment.ProcessId)
+                    continue;
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(4000);
+            }
+            catch
+            {
+                // That copy has already exited.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
     }
 
     private static string ShortcutPath => Path.Combine(
