@@ -70,18 +70,38 @@ internal static class Installer
         try { if (File.Exists(ShortcutPath)) File.Delete(ShortcutPath); } catch { /* shortcut in use */ }
 
         StopOtherCopies();
+        RemoveInstallFolder();
+    }
 
+    private static void RemoveInstallFolder()
+    {
         if (!Directory.Exists(DirectoryPath))
             return;
 
-        Process.Start(new ProcessStartInfo
+        foreach (var file in Directory.EnumerateFiles(DirectoryPath, "*", SearchOption.AllDirectories))
         {
-            FileName = "cmd.exe",
-            Arguments = "/c ping 127.0.0.1 -n 3 >nul & rmdir /s /q \"" + DirectoryPath + "\"",
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            WindowStyle = ProcessWindowStyle.Hidden
-        });
+            try
+            {
+                File.SetAttributes(file, FileAttributes.Normal);
+                File.Delete(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                NativeMethods.MoveFileEx(file, null, NativeMethods.MoveFileDelayUntilReboot);
+            }
+        }
+
+        try
+        {
+            if (!Directory.EnumerateFileSystemEntries(DirectoryPath).Any())
+                Directory.Delete(DirectoryPath, recursive: false);
+            else
+                NativeMethods.MoveFileEx(DirectoryPath, null, NativeMethods.MoveFileDelayUntilReboot);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            NativeMethods.MoveFileEx(DirectoryPath, null, NativeMethods.MoveFileDelayUntilReboot);
+        }
     }
 
     private static bool TryReplace(string source, string destination)

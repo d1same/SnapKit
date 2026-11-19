@@ -51,6 +51,20 @@ internal sealed class TrayHost : IDisposable
             if (e.Button == MouseButtons.Left)
                 state.Coordinator.Start(CaptureAction.Area);
         };
+        TrayPromoter.KeepBesideClock(RefreshIcon);
+    }
+
+    private void RefreshIcon()
+    {
+        try
+        {
+            _icon.Visible = false;
+            _icon.Visible = true;
+        }
+        catch
+        {
+            // The icon can already be gone if the app is exiting.
+        }
     }
 
     public void Balloon(string title, string text)

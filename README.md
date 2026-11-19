@@ -8,11 +8,11 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://qu.ax/x7Tq2)
+[SnapKit-win-x64.zip](https://qu.ax/rmU6Q)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 11:00 PM ET**. Unzip it and run `SnapKit.exe` once.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (64 MB). The link lasts until **19 Dec 2026, 12:11 AM ET**. Unzip it and run `SnapKit.exe` once.
 
-That first run installs SnapKit for the current user. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens in the tray. Running a newer zip closes whatever SnapKit is already running and replaces it.
+That first run installs SnapKit for the current user. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip closes whatever SnapKit is already running and replaces it.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -102,7 +102,7 @@ These are the defaults. Change them in Settings. They are stored in `%APPDATA%\S
 
 Windows 11 often gives `PrtSc` to the Snipping Tool. Turn that off in Windows Settings, then set SnapKit's keys again if a shortcut fails to register.
 
-Settings also has **start with Windows**, a short white flash after a capture, and a shutter sound. Flash is on. Sound is off.
+Settings also has **start with Windows** (on), a short white flash after a capture, and a shutter sound. Flash is on. Sound is off. On Windows 11 the tray icon is placed next to the clock. If it still lands in the overflow, open Settings → Personalization → Taskbar → Other system tray icons and turn SnapKit on.
 
 ## Change the name
 

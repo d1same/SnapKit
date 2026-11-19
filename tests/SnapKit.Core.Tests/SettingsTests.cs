@@ -33,6 +33,30 @@ public class SettingsTests
     }
 
     [Fact]
+    public void Startup_stays_on_when_the_file_does_not_mention_it()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "snapkit-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, "{ \"captureFlash\": false }");
+            var loaded = SettingsStore.Load(path);
+            Assert.True(loaded.StartWithWindows);
+            Assert.False(loaded.CaptureFlash);
+            Assert.True(AppSettings.CreateDefault().StartWithWindows);
+
+            File.WriteAllText(path, "{ \"startWithWindows\": false }");
+            Assert.True(SettingsStore.Load(path).StartWithWindows);
+
+            File.WriteAllText(path, "{ \"startWithWindows\": false, \"revision\": 2 }");
+            Assert.False(SettingsStore.Load(path).StartWithWindows);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Hotkey_names_match_the_defaults()
     {
         var settings = AppSettings.CreateDefault();

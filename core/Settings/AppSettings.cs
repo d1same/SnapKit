@@ -7,13 +7,33 @@ public sealed class AppSettings
     public HotkeyGesture FullScreen { get; set; } = new() { VirtualKey = 0x2C, Alt = true };
     public HotkeyGesture Scrolling { get; set; } = new() { VirtualKey = 0x2C, Ctrl = true, Shift = true };
     public HotkeyGesture Ocr { get; set; } = new() { VirtualKey = 0x4F, Ctrl = true, Shift = true };
-    public bool StartWithWindows { get; set; }
+    public bool StartWithWindows { get; set; } = true;
+
+    /// <summary>
+    /// 2 is the first revision that turns startup on for existing installs.
+    /// A later save keeps whatever the user chose.
+    /// </summary>
+    public int Revision { get; set; }
     public bool CaptureFlash { get; set; } = true;
     public bool ShutterSound { get; set; }
 
     // v2 can add a Record gesture next to these without changing the file shape much.
 
-    public static AppSettings CreateDefault() => new();
+    public static AppSettings CreateDefault()
+    {
+        var settings = new AppSettings();
+        ApplyStartupDefault(settings);
+        return settings;
+    }
+
+    public static bool ApplyStartupDefault(AppSettings settings)
+    {
+        if (settings.Revision >= 2)
+            return false;
+        settings.StartWithWindows = true;
+        settings.Revision = 2;
+        return true;
+    }
 
     public HotkeyGesture GestureFor(CaptureAction action) => action switch
     {

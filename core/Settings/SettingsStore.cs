@@ -23,8 +23,19 @@ public static class SettingsStore
         {
             if (!File.Exists(path))
                 return AppSettings.CreateDefault();
-            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Json);
-            return settings ?? AppSettings.CreateDefault();
+            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Json) ?? AppSettings.CreateDefault();
+            if (AppSettings.ApplyStartupDefault(settings))
+            {
+                try
+                {
+                    Save(settings, path);
+                }
+                catch
+                {
+                    // The in-memory setting still starts the app if the file is locked.
+                }
+            }
+            return settings;
         }
         catch
         {

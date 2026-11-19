@@ -57,9 +57,18 @@ public partial class App : System.Windows.Application
         _state.Tray = new TrayHost(_state);
         _state.Hotkeys.RegisterAll();
         if (settings.StartWithWindows)
-            StartupRegistration.Apply(true);
+        {
+            try
+            {
+                StartupRegistration.Apply(true);
+            }
+            catch (Exception ex)
+            {
+                _state.Tray.Balloon(Brand.Name, ex.Message);
+            }
+        }
         if (_firstRun)
-            _state.Tray.Balloon(Brand.Name, "Installed. SnapKit is in the Start menu and the system tray. Ctrl+Alt+Shift+Esc quits if a window gets stuck.");
+            _state.Tray.Balloon(Brand.Name, "Installed. SnapKit starts with Windows and sits next to the clock. Ctrl+Alt+Shift+Esc quits if a window gets stuck.");
     }
 
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
