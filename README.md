@@ -6,15 +6,15 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 ## Download
 
-Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
+Windows 10 or 11, 64-bit.
 
-[SnapKit-win-x64.zip](https://qu.ax/2DPHh)
+[SnapKit 0.1.2](https://github.com/d1same/SnapKit/releases/tag/v0.1.2)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (64 MB, version 1.2.0). The link lasts until **19 Dec 2026, 8:01 AM ET**. Unzip it and run `SnapKit.exe` once.
+Download `SnapKit-win-x64.zip` from that release. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. A window stays on screen while it copies, so the install is not a silent pause. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip shows **Updating SnapKit**, closes whatever SnapKit is already running, and replaces it.
 
-This build is **1.2.0**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, an update window names both versions. **Update** downloads the zip, and the new copy shows the same install window while it replaces the old one. Settings also has **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. Until that repository has a release, the check says none was found.
+This build is **0.1.2**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, an update window names both versions. **Update** downloads the zip, and the new copy shows the same install window while it replaces the old one. Settings also has **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
