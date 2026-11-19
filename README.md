@@ -8,9 +8,9 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://filebin.net/snapkit-win-x64/SnapKit-win-x64.zip)
+[SnapKit-win-x64.zip](https://qu.ax/jGWSZ)
 
-The link lasts until **26 Nov 2026**. The first visit shows a warning page. Click **Proceed to download**. Unzip, then run `SnapKit.exe`.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 7:23 PM ET**. Unzip, then run `SnapKit.exe`.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
