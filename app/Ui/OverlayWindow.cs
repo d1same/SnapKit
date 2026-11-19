@@ -120,11 +120,11 @@ internal sealed class OverlayWindow : Window
 {
     private readonly OverlaySession _session;
     private readonly Image _image = new() { Stretch = Stretch.Fill, IsHitTestVisible = false };
-    private readonly Path _dim = new() { Fill = Palette.Freeze(0, 0, 0, 0x40), IsHitTestVisible = false };
+    private readonly Path _dim = new() { Fill = Palette.Freeze(0, 0, 0, 0x78), IsHitTestVisible = false };
     private readonly Rectangle _selectionInk = new()
     {
         Stroke = Brushes.Black,
-        StrokeThickness = 1.25,
+        StrokeThickness = 2,
         StrokeDashArray = new DoubleCollection { 5, 4 },
         StrokeDashOffset = 5,
         Fill = Brushes.Transparent,
@@ -137,7 +137,7 @@ internal sealed class OverlayWindow : Window
     private readonly Rectangle _selection = new()
     {
         Stroke = Brushes.White,
-        StrokeThickness = 1.25,
+        StrokeThickness = 2,
         StrokeDashArray = new DoubleCollection { 5, 4 },
         Fill = Brushes.Transparent,
         IsHitTestVisible = false,
@@ -362,7 +362,6 @@ internal sealed class OverlayWindow : Window
             if (x < Shot.Pixels.Width && y < Shot.Pixels.Height && x + pick.Image.Width > 0 && y + pick.Image.Height > 0)
             {
                 ShowRect(Math.Max(0, x), Math.Max(0, y), pick.Image.Width, pick.Image.Height, null);
-                HideSelection();
                 _sizePill.Visibility = Visibility.Collapsed;
                 return;
             }

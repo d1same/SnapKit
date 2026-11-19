@@ -142,7 +142,7 @@ internal sealed class CaptureCoordinator
                 // The hud sizes to content after show; nudge it to the bottom of the monitor.
                 int width = Math.Max(220, (int)(hud.ActualWidth * scale));
                 int height = Math.Max(36, (int)(hud.ActualHeight * scale));
-                WindowChrome.Place(hud, monitor.X + (monitor.Width - width) / 2, monitor.Bottom - height - 24, width, height, scale, topmost: true, activate: true);
+                WindowChrome.Place(hud, monitor.X + (monitor.Width - width) / 2, monitor.Bottom - height - 24, width, height, scale, topmost: true, activate: false);
             });
             var image = await ScrollCapture.RunAsync(hwnd, hud, hud.Token);
             if (image == null)
