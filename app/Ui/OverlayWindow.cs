@@ -161,6 +161,10 @@ internal sealed class OverlayWindow : Window
     private bool _frozen;
     private bool _closing;
     private bool _dragMoved;
+    private int _dragX;
+    private int _dragY;
+    private int _dragW;
+    private int _dragH;
     private readonly Border _choiceHost;
     private readonly StackPanel _choiceRows = new();
     private List<SnapTarget> _snaps = new();
@@ -368,7 +372,7 @@ internal sealed class OverlayWindow : Window
             OverlayMode.Window => "Window    ·    Click the highlighted window    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
             OverlayMode.FullScreen => "Full screen    ·    Click to capture this monitor    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
             OverlayMode.ScrollPick => "Click the window to scroll-capture    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
-            _ => "Drag to draw    ·    hover snaps to a pane, tab, window, or the screen    ·    Esc cancels"
+            _ => "Drag a box to capture just that    ·    click the dashed target    ·    scroll changes it    ·    Esc cancels"
         };
         Cursor = _session.Mode == OverlayMode.Area ? Cursors.Cross : Cursors.Hand;
         if (_session.Mode != OverlayMode.Area)
@@ -429,7 +433,7 @@ internal sealed class OverlayWindow : Window
         e.Handled = true;
         if (_snaps.Count == 0)
         {
-            var (x, y) = ToPixel(Mouse.GetPosition(this));
+            var (x, y) = CursorLocal();
             OfferSnaps(x, y);
         }
         CycleSnap(e.Delta > 0 ? 1 : -1);
@@ -439,9 +443,9 @@ internal sealed class OverlayWindow : Window
     {
         if (_frozen)
             return;
-        var (x, y) = ToPixel(e.GetPosition(this));
         if (_session.Mode == OverlayMode.Area)
         {
+            var (x, y) = CursorLocal();
             _dragging = true;
             _dragMoved = false;
             _startX = x;
@@ -471,21 +475,28 @@ internal sealed class OverlayWindow : Window
     {
         if (_frozen)
             return;
-        var (x, y) = ToPixel(e.GetPosition(this));
         if (_session.Mode == OverlayMode.Area && _dragging)
         {
-            if (Math.Abs(x - _startX) > 6 || Math.Abs(y - _startY) > 6)
+            var (x, y) = CursorLocal();
+            int w = Math.Abs(x - _startX);
+            int h = Math.Abs(y - _startY);
+            if (w > 10 || h > 10)
                 _dragMoved = true;
             if (_dragMoved)
             {
                 _choiceHost.Visibility = Visibility.Collapsed;
-                ShowRect(Math.Min(_startX, x), Math.Min(_startY, y), Math.Abs(x - _startX), Math.Abs(y - _startY), null);
+                _dragX = Math.Min(_startX, x);
+                _dragY = Math.Min(_startY, y);
+                _dragW = Math.Max(1, w);
+                _dragH = Math.Max(1, h);
+                ShowRect(_dragX, _dragY, _dragW, _dragH, null);
                 UpdateLoupe(x, y);
             }
             return;
         }
         if (_session.Mode == OverlayMode.Area)
         {
+            var (x, y) = CursorLocal();
             OfferSnaps(x, y);
             return;
         }
@@ -514,29 +525,51 @@ internal sealed class OverlayWindow : Window
         if (IsMouseCaptured)
             ReleaseMouseCapture();
         _loupe.Visibility = Visibility.Collapsed;
-        if (!_dragMoved)
+        if (_dragMoved && _dragW >= 4 && _dragH >= 4)
         {
-            if (_snaps.Count == 0)
-                OfferSnaps(_startX, _startY);
-            if (_snapIndex >= 0 && _snapIndex < _snaps.Count)
+            var crop = Shot.Pixels.Crop(_dragX, _dragY, _dragW, _dragH);
+            _session.Complete(new CapturePick
             {
-                CaptureSnap(_snaps[_snapIndex]);
-                return;
-            }
-        }
-        if (_selW < 4 || _selH < 4)
-        {
-            RefreshChrome();
+                Image = crop,
+                ScreenX = Shot.Monitor.X + _dragX,
+                ScreenY = Shot.Monitor.Y + _dragY,
+                Monitor = Shot.Monitor
+            });
             return;
         }
-        var crop = Shot.Pixels.Crop(_selX, _selY, _selW, _selH);
-        _session.Complete(new CapturePick
+        if (_snaps.Count == 0)
         {
-            Image = crop,
-            ScreenX = Shot.Monitor.X + _selX,
-            ScreenY = Shot.Monitor.Y + _selY,
-            Monitor = Shot.Monitor
-        });
+            var (x, y) = CursorLocal();
+            OfferSnaps(x, y);
+        }
+        if (_snapIndex >= 0 && _snapIndex < _snaps.Count)
+        {
+            CaptureSnap(_snaps[_snapIndex]);
+            return;
+        }
+        RefreshChrome();
+    }
+
+    private (int X, int Y) CursorLocal()
+    {
+        NativeMethods.GetCursorPos(out var point);
+        int maxX = Math.Max(0, Shot.Pixels.Width - 1);
+        int maxY = Math.Max(0, Shot.Pixels.Height - 1);
+        return (
+            Math.Clamp(point.X - Shot.Monitor.X, 0, maxX),
+            Math.Clamp(point.Y - Shot.Monitor.Y, 0, maxY));
+    }
+
+    private bool HeldByCurrentTarget(int localX, int localY)
+    {
+        if (_snapIndex < 0 || _snapIndex >= _snaps.Count)
+            return false;
+        var current = _snaps[_snapIndex];
+        if (current.Kind == "Entire screen")
+            return false;
+        int x = Shot.Monitor.X + localX;
+        int y = Shot.Monitor.Y + localY;
+        return x >= current.X && x < current.Right && y >= current.Y && y < current.Bottom;
     }
 
     private void FinishWindow(TopWindow window)
@@ -572,6 +605,8 @@ internal sealed class OverlayWindow : Window
         int sy = Shot.Monitor.Y + Math.Clamp(pixelY, 0, Math.Max(0, Shot.Pixels.Height - 1));
         var found = SnapFinder.At(sx, sy, Shot.Monitor).ToList();
         if (found.Count == 0)
+            return;
+        if (HeldByCurrentTarget(sx, sy))
             return;
         bool same = found.Count == _snaps.Count;
         if (same)

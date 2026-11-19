@@ -33,12 +33,12 @@ internal static class SnapFinder
         {
             string cls = ClassName(window.Handle);
             string title = Short(window.Title);
-            foreach (var child in ChildrenAt(window, x, y))
+            var content = ContentChild(window, x, y);
+            if (content != null)
             {
-                var local = Clip(child.Bounds, monitor);
-                if (local.Width < 80 || local.Height < 60)
-                    continue;
-                AddDistinct(found, local, LabelChild(child.ClassName, cls), title);
+                var local = Clip(content.Bounds, monitor);
+                if (local.Width >= 80 && local.Height >= 60 && ClearlyInside(local, window.Bounds))
+                    AddDistinct(found, local, LabelChild(content.ClassName, cls), title);
             }
 
             var frame = Clip(window.Bounds, monitor);
@@ -120,45 +120,55 @@ internal static class SnapFinder
         public string ClassName { get; init; } = "";
     }
 
-    private static List<ChildHit> ChildrenAt(TopWindow window, int x, int y)
+    private static bool ClearlyInside(NativeMethods.Rect inner, NativeMethods.Rect outer)
     {
-        var hits = new List<ChildHit>();
+        return inner.Left >= outer.Left + 24 || inner.Top >= outer.Top + 24
+            || inner.Right <= outer.Right - 24 || inner.Bottom <= outer.Bottom - 24;
+    }
+
+    /// <summary>
+    /// One content rectangle, not every nested child. The page, the tab, or the folder.
+    /// Smaller siblings are what made the outline jump between panes.
+    /// </summary>
+    private static ChildHit? ContentChild(TopWindow window, int x, int y)
+    {
+        ChildHit? best = null;
+        long bestArea = -1;
+        bool explorer = IsExplorer(ClassName(window.Handle));
         NativeMethods.EnumWindowsProc callback = (hwnd, _) =>
         {
             if (!NativeMethods.IsWindowVisible(hwnd))
+                return true;
+            string cls = ClassName(hwnd);
+            if (cls == "DirectUIHWND" && !explorer)
+                return true;
+            if (!IsContentClass(cls))
                 return true;
             var bounds = WindowFinder.GetBounds(hwnd);
             if (bounds.Width < 80 || bounds.Height < 60)
                 return true;
             if (x < bounds.Left || x >= bounds.Right || y < bounds.Top || y >= bounds.Bottom)
                 return true;
-            long area = (long)bounds.Width * bounds.Height;
-            long parent = (long)window.Bounds.Width * window.Bounds.Height;
-            if (parent > 0 && area > parent * 98 / 100)
+            if (!ClearlyInside(bounds, window.Bounds))
                 return true;
-            hits.Add(new ChildHit { Bounds = bounds, ClassName = ClassName(hwnd) });
+            long area = (long)bounds.Width * bounds.Height;
+            if (area > bestArea)
+            {
+                bestArea = area;
+                best = new ChildHit { Bounds = bounds, ClassName = cls };
+            }
             return true;
         };
         NativeMethods.EnumChildWindows(window.Handle, callback, IntPtr.Zero);
-        hits.Sort((a, b) => ((long)a.Bounds.Width * a.Bounds.Height).CompareTo((long)b.Bounds.Width * b.Bounds.Height));
-
-        var kept = new List<ChildHit>();
-        foreach (var hit in hits)
-        {
-            if (kept.Count == 0)
-            {
-                kept.Add(hit);
-                continue;
-            }
-            var previous = kept[^1].Bounds;
-            bool grew = hit.Bounds.Width >= previous.Width + 24 || hit.Bounds.Height >= previous.Height + 24;
-            if (grew)
-                kept.Add(hit);
-            if (kept.Count == 4)
-                break;
-        }
-        return kept;
+        return best;
     }
+
+    private static bool IsContentClass(string cls) => cls is
+        "Chrome_RenderWidgetHostHWND" or
+        "MozillaCompositorWindowClass" or
+        "SHELLDLL_DefView" or
+        "SysListView32" or
+        "DirectUIHWND";
 
     private static NativeMethods.Rect Clip(NativeMethods.Rect rect, MonitorInfo monitor)
     {
