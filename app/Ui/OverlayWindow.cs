@@ -362,7 +362,7 @@ internal sealed class OverlayWindow : Window
             if (x < Shot.Pixels.Width && y < Shot.Pixels.Height && x + pick.Image.Width > 0 && y + pick.Image.Height > 0)
             {
                 ShowRect(Math.Max(0, x), Math.Max(0, y), pick.Image.Width, pick.Image.Height, null);
-                OutsetSelection(8);
+                HideSelection();
                 _sizePill.Visibility = Visibility.Collapsed;
                 return;
             }
@@ -907,19 +907,6 @@ internal sealed class OverlayWindow : Window
         int right = Math.Min(Shot.Monitor.Width, bounds.Right - Shot.Monitor.X);
         int bottom = Math.Min(Shot.Monitor.Height, bounds.Bottom - Shot.Monitor.Y);
         return (x, y, Math.Max(0, right - x), Math.Max(0, bottom - y));
-    }
-
-    private void OutsetSelection(double dip)
-    {
-        if (_selection.Visibility != Visibility.Visible)
-            return;
-        var margin = _selection.Margin;
-        _selection.Margin = new Thickness(margin.Left - dip, margin.Top - dip, 0, 0);
-        _selection.Width = Math.Max(1, _selection.Width + dip * 2);
-        _selection.Height = Math.Max(1, _selection.Height + dip * 2);
-        _selectionInk.Margin = _selection.Margin;
-        _selectionInk.Width = _selection.Width;
-        _selectionInk.Height = _selection.Height;
     }
 
     private void HideSelection()

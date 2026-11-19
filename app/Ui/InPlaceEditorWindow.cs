@@ -39,7 +39,7 @@ internal sealed class InPlaceEditorWindow : Window
 
         _surface = new ShotSurface(session.Document);
         _toolbar = new ToolbarView(showFit: false);
-        _frameInk = Dash(Brushes.Black, 2.75);
+        _frameInk = Dash(Brushes.Black, 4);
         _frame = Dash(Brushes.White, 0);
         Wire();
         var canvas = new Canvas { Background = Brushes.Transparent };
@@ -211,8 +211,8 @@ internal sealed class InPlaceEditorWindow : Window
     private static Rectangle Dash(Brush stroke, double offset) => new()
     {
         Stroke = stroke,
-        StrokeThickness = 2.5,
-        StrokeDashArray = new DoubleCollection { 3, 2.4 },
+        StrokeThickness = 1.5,
+        StrokeDashArray = new DoubleCollection { 4, 4 },
         StrokeDashOffset = offset,
         Fill = Brushes.Transparent,
         IsHitTestVisible = false,
