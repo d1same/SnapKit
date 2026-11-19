@@ -37,7 +37,7 @@ internal sealed class TrayHost : IDisposable
         _menu.Items.Add(_recent);
         _menu.Items.Add(new ToolStripSeparator());
         Add("Settings / Shortcuts", ShowSettings);
-        Add("Exit", () => System.Windows.Application.Current.Shutdown());
+        Add("Exit", Failsafe.Kill);
 
         _icon = new NotifyIcon
         {

@@ -28,8 +28,8 @@ internal sealed class InPlaceEditorWindow : Window
         AllowsTransparency = true;
         Background = Brushes.Transparent;
         ResizeMode = ResizeMode.NoResize;
-        ShowInTaskbar = false;
-        Topmost = true;
+        ShowInTaskbar = true;
+        Topmost = false;
         ShowActivated = true;
         WindowStartupLocation = WindowStartupLocation.Manual;
         Opacity = 0;
@@ -141,51 +141,37 @@ internal sealed class InPlaceEditorWindow : Window
         int imgH = Math.Max(1, _session.Document.View.Height);
         _placedW = imgW;
         _placedH = imgH;
-        _surface.SetPixelScale(scale);
 
-        double maxDip = Math.Max(imgW / scale, 280);
-        _toolbar.MaxWidth = maxDip;
-        _toolbar.Measure(new Size(maxDip, double.PositiveInfinity));
+        int limitW = Math.Max(280, _monitor.Width - 96);
+        int limitH = Math.Max(200, _monitor.Height - 96);
+        _toolbar.MaxWidth = Math.Max(280, limitW / scale);
+        _toolbar.Measure(new Size(_toolbar.MaxWidth, double.PositiveInfinity));
         int toolW = Math.Max(1, (int)Math.Ceiling(_toolbar.DesiredSize.Width * scale));
         int toolH = Math.Max(40, (int)Math.Ceiling(_toolbar.DesiredSize.Height * scale));
+        int availH = Math.Max(80, limitH - toolH);
+        double fit = Math.Min(1, Math.Min(limitW / (double)Math.Max(imgW, toolW), availH / (double)imgH));
+        if (double.IsNaN(fit) || fit <= 0)
+            fit = 1;
+        _surface.SetPixelScale(scale / fit);
+
+        int showW = Math.Max(1, (int)Math.Round(Math.Max(imgW, toolW) * fit));
+        int showH = Math.Max(1, (int)Math.Round(imgH * fit));
+        int winW = Math.Min(limitW, Math.Max(showW, toolW));
+        int winH = Math.Min(limitH, showH + toolH);
 
         int screenX = _originX + _session.Document.View.X;
         int screenY = _originY + _session.Document.View.Y;
-        bool roomBelow = _monitor.Bottom - (screenY + imgH) >= toolH;
-        bool roomAbove = screenY - _monitor.Y >= toolH;
-        bool below = roomBelow || !roomAbove;
-
-        int contentW = Math.Max(imgW, toolW);
-        int contentH = imgH + toolH;
-        int winW = Math.Min(contentW, _monitor.Width);
-        int winH = Math.Min(contentH, _monitor.Height);
-        int winX = screenX;
+        bool below = _monitor.Bottom - (screenY + showH) >= toolH || screenY - _monitor.Y < toolH;
+        int winX = Math.Clamp(screenX, _monitor.X, Math.Max(_monitor.X, _monitor.Right - winW));
         int winY = below ? screenY : screenY - toolH;
-        if (winX + winW > _monitor.Right)
-            winX = _monitor.Right - winW;
-        if (winY + winH > _monitor.Bottom)
-            winY = _monitor.Bottom - winH;
-        if (winX < _monitor.X)
-            winX = _monitor.X;
-        if (winY < _monitor.Y)
-            winY = _monitor.Y;
+        winY = Math.Clamp(winY, _monitor.Y, Math.Max(_monitor.Y, _monitor.Bottom - winH));
 
-        int imageX = Math.Clamp(screenX - winX, 0, Math.Max(0, winW - 1));
-        int imageY = Math.Clamp(screenY - winY, 0, Math.Max(0, winH - 1));
-        Canvas.SetLeft(_surface, imageX / scale);
-        Canvas.SetTop(_surface, imageY / scale);
-
-        double toolX = imageX / scale;
-        double toolY = below
-            ? (imageY + imgH) / scale
-            : imageY / scale - _toolbar.DesiredSize.Height;
-        if (toolY < 0)
-            toolY = Math.Max(0, winH / scale - _toolbar.DesiredSize.Height);
-        if (toolY + _toolbar.DesiredSize.Height > winH / scale)
-            toolY = Math.Max(0, winH / scale - _toolbar.DesiredSize.Height);
-        Canvas.SetLeft(_toolbar, Math.Max(0, toolX));
-        Canvas.SetTop(_toolbar, toolY);
-        WindowChrome.Place(this, winX, winY, winW, winH, scale, topmost: true, activate: true);
+        Canvas.SetLeft(_surface, 0);
+        Canvas.SetTop(_surface, below ? 0 : toolH / scale);
+        Canvas.SetLeft(_toolbar, 0);
+        Canvas.SetTop(_toolbar, below ? showH / scale : 0);
+        Topmost = false;
+        WindowChrome.Place(this, winX, winY, winW, winH, scale, topmost: false, activate: true, inTaskbar: true);
     }
 
     private void Pin()

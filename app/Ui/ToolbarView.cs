@@ -127,7 +127,7 @@ internal sealed class ToolbarView : Border
 
         _hint = new TextBlock
         {
-            Text = "Right-click copies the picture. Ctrl+S saves. Esc discards.",
+            Text = "Right-click copies. Esc closes this window. Ctrl+Alt+Shift+Esc quits.",
             Foreground = Palette.Muted,
             FontFamily = Palette.Font,
             FontSize = 11,

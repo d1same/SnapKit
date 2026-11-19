@@ -1,7 +1,9 @@
-using System.Runtime.InteropServices;
+using System.IO;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
+using Windows.Storage.Streams;
 
 namespace SnapKit;
 
@@ -60,34 +62,30 @@ internal static class OcrClient
         }
 
         working.ForceOpaque();
-        using var bitmap = ToSoftwareBitmap(working);
+        using var bitmap = await LoadSoftwareBitmap(working);
         var result = await engine.RecognizeAsync(bitmap);
         return (result.Text ?? "").Trim();
     }
 
-    private static SoftwareBitmap ToSoftwareBitmap(PixelBuffer source)
+    private static async Task<SoftwareBitmap> LoadSoftwareBitmap(PixelBuffer source)
     {
-        var bitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, source.Width, source.Height, BitmapAlphaMode.Straight);
-        using var buffer = bitmap.LockBuffer(BitmapBufferAccessMode.Write);
-        using var reference = buffer.CreateReference();
-        ((IMemoryBufferByteAccess)reference).GetBuffer(out IntPtr data, out uint capacity);
-        var plane = buffer.GetPlaneDescription(0);
-        int rowBytes = source.Width * 4;
-        for (int y = 0; y < source.Height; y++)
-        {
-            int destination = plane.StartIndex + y * plane.Stride;
-            if (destination < 0 || destination + rowBytes > capacity)
-                break;
-            Marshal.Copy(source.Pixels, y * source.Stride, data + destination, rowBytes);
-        }
-        return bitmap;
+        var png = EncodePng(source);
+        using var stream = new InMemoryRandomAccessStream();
+        var writer = new DataWriter(stream);
+        writer.WriteBytes(png);
+        await writer.StoreAsync();
+        writer.DetachStream();
+        stream.Seek(0);
+        var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
+        return await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
     }
 
-    [ComImport]
-    [Guid("5B0D3235-4DBA-4D44-865E-8F1D0E4FD04D")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMemoryBufferByteAccess
+    private static byte[] EncodePng(PixelBuffer source)
     {
-        void GetBuffer(out IntPtr buffer, out uint capacity);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(BitmapConvert.ToBitmapSource(source)));
+        using var memory = new MemoryStream();
+        encoder.Save(memory);
+        return memory.ToArray();
     }
 }

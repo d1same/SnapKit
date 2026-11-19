@@ -15,7 +15,7 @@ internal sealed class OcrWindow : Window
         Background = Palette.Bg;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ShowInTaskbar = true;
-        Topmost = true;
+        Topmost = false;
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == System.Windows.Input.Key.Escape)
@@ -73,9 +73,30 @@ internal sealed class OcrWindow : Window
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 12, 0, 0),
-            Children = { copy, close }
+            Margin = new Thickness(0, 12, 0, 0)
         };
+        if (!string.IsNullOrWhiteSpace(body))
+            buttons.Children.Add(copy);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            var copyError = new Button
+            {
+                Content = "Copy error",
+                Margin = new Thickness(0, 0, 8, 0),
+                Padding = new Thickness(12, 6, 12, 6),
+                Background = Palette.Text,
+                Foreground = Palette.Ink,
+                BorderThickness = new Thickness(0),
+                FontFamily = Palette.Font
+            };
+            var errorText = error;
+            copyError.Click += (_, _) =>
+            {
+                try { Clipboard.SetText(errorText); } catch { /* clipboard busy */ }
+            };
+            buttons.Children.Add(copyError);
+        }
+        buttons.Children.Add(close);
         Content = new DockPanel
         {
             Margin = new Thickness(16),

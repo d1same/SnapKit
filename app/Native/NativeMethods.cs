@@ -45,6 +45,7 @@ internal static class NativeMethods
     public const uint KeyEventKeyUp = 0x0002;
 
     public static readonly IntPtr HwndTopmost = new(-1);
+    public static readonly IntPtr HwndNotTopmost = new(-2);
 
     [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr hWnd);

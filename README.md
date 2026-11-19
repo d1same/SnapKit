@@ -8,11 +8,15 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://qu.ax/cZRX4)
+[SnapKit-win-x64.zip](https://qu.ax/IVDBz)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 7:34 PM ET**. Unzip, then run `SnapKit.exe`.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (63 MB). The link lasts until **18 Dec 2026, 7:44 PM ET**. Unzip it and run `SnapKit.exe` once.
+
+That first run installs SnapKit for the current user. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens in the tray. Running a newer zip later updates that same install. Quit SnapKit from the tray first if Windows says the file is in use.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
+
+`Ctrl+Alt+Shift+Esc` quits SnapKit immediately, even if a window is stuck on top of the desktop. Esc during a capture cancels it. Esc in the editor closes that window only.
 
 ## Use it
 
@@ -90,6 +94,7 @@ These are the defaults. Change them in Settings. They are stored in `%APPDATA%\S
 | `Alt+PrtSc` | Full screen |
 | `Ctrl+Shift+PrtSc` | Scrolling capture |
 | `Ctrl+Shift+O` | OCR |
+| `Ctrl+Alt+Shift+Esc` | Quit SnapKit immediately |
 
 Windows 11 often gives `PrtSc` to the Snipping Tool. Turn that off in Windows Settings, then set SnapKit's keys again if a shortcut fails to register.
 
@@ -129,4 +134,6 @@ GIF and MP4 recording is left for v2. The hook is `IScreenRecorder` in `app/Capt
 - Scrolling capture moves the mouse onto the window, scrolls with the wheel, and stitches by overlap. It stops at the end of the page, on `Esc`, or at 16,000 pixels. A window that does not scroll with the wheel, or a page that keeps animating, can stop the stitch early.
 - The scrollbar column is ignored. A fixed header and footer are kept from the first frame.
 - Cross-monitor drag is not supported.
-- This build was compiled and unit-tested here. The window, hotkeys, OCR, and scrolling were not run on a Windows desktop.
+- After you finish a selection, the full-screen overlay closes. The editor is only as large as the picture and the toolbar, and it is not pinned above other apps.
+- `Ctrl+Alt+Shift+Esc` and the tray **Exit** command end the process from outside the window that draws the capture.
+- This build was compiled and unit-tested here. The window, hotkeys, OCR, and install were not run on a Windows desktop. OCR now decodes a PNG through the Windows runtime instead of casting a COM buffer.

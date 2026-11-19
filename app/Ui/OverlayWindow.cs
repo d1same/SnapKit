@@ -65,16 +65,10 @@ internal sealed class OverlaySession
         if (_done)
             return;
         _done = true;
-        if (pick == null || Purpose != OverlayPurpose.Edit)
+        foreach (var window in _windows.ToList())
         {
-            foreach (var window in _windows.ToList())
-                window.ForceClose();
-        }
-        else
-        {
-            Frozen = true;
-            foreach (var window in _windows)
-                window.Freeze();
+            window.Topmost = false;
+            window.ForceClose();
         }
         Finished?.Invoke(pick);
     }
@@ -265,10 +259,10 @@ internal sealed class OverlayWindow : Window
     {
         _hintText.Text = _session.Mode switch
         {
-            OverlayMode.Window => "Window    ·    Click the highlighted window    ·    Space changes mode    ·    Esc cancels",
-            OverlayMode.FullScreen => "Full screen    ·    Click to capture this monitor    ·    Space changes mode    ·    Esc cancels",
-            OverlayMode.ScrollPick => "Click the window to scroll-capture    ·    Esc cancels",
-            _ => "Area    ·    Drag to select    ·    Space changes mode    ·    Esc cancels"
+            OverlayMode.Window => "Window    ·    Click the highlighted window    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
+            OverlayMode.FullScreen => "Full screen    ·    Click to capture this monitor    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
+            OverlayMode.ScrollPick => "Click the window to scroll-capture    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
+            _ => "Area    ·    Drag to select    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits"
         };
         Cursor = _session.Mode == OverlayMode.Area ? Cursors.Cross : Cursors.Hand;
         if (_session.Mode == OverlayMode.FullScreen)

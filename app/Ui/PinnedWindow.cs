@@ -103,30 +103,11 @@ internal sealed class PinnedWindow : Window
         };
 
         MouseRightButtonUp += (_, _) => ImageFile.Copy(_image);
-        var menu = new ContextMenu
-        {
-            Background = Palette.Card,
-            Foreground = Palette.Text,
-            BorderBrush = Palette.Line,
-            BorderThickness = new Thickness(1)
-        };
-        menu.Items.Add(Item("Copy", () => ImageFile.Copy(_image)));
-        menu.Items.Add(Item("Save as…", () => ImageFile.Save(_image, this)));
-        menu.Items.Add(Item("Close", Close));
+        var menu = DarkMenu.Create();
+        menu.Items.Add(DarkMenu.Item("Copy", () => ImageFile.Copy(_image)));
+        menu.Items.Add(DarkMenu.Item("Save as…", () => ImageFile.Save(_image, this)));
+        menu.Items.Add(DarkMenu.Item("Close", Close));
         ContextMenu = menu;
         ToolTip = "Right-click copies the picture. Drag to move. Esc closes.";
-    }
-
-    private static MenuItem Item(string text, Action action)
-    {
-        var item = new MenuItem
-        {
-            Header = text,
-            Background = Palette.Card,
-            Foreground = Palette.Text,
-            FontFamily = Palette.Font
-        };
-        item.Click += (_, _) => action();
-        return item;
     }
 }
