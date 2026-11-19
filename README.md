@@ -8,13 +8,13 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit.
 
-[SnapKit 0.1.6](https://github.com/d1same/SnapKit/releases/tag/v0.1.6)
+[SnapKit 0.1.7](https://github.com/d1same/SnapKit/releases/tag/v0.1.7)
 
 Download `SnapKit-win-x64.zip` from that release. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. A window stays on screen while it copies, so the install is not a silent pause. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip shows **Updating SnapKit**, closes whatever SnapKit is already running, and replaces it.
 
-This build is **0.1.6**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, an update window names both versions. **Update** downloads the zip, and the new copy shows the same install window while it replaces the old one. Settings also has **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
+This build is **0.1.7**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, an update window names both versions. **Update** downloads the zip, and the new copy shows the same install window while it replaces the old one. Settings also has **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -24,7 +24,7 @@ Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **R
 
 Left-click the tray icon to capture an area. Right-click for the menu.
 
-You drag a box around a dialog, press `T`, type "Click Save", then right-click the picture and choose **Copy**. Paste it into chat, email, or a ticket. A file appears only if you press `Ctrl+S`.
+You drag a box around a dialog, press `T`, type "Click Save", then press the **Copy** button on the toolbar. Paste it into chat, email, or a ticket. Right-click still offers Copy or Save. A file appears only if you press `Ctrl+S` or Save.
 
 ### Tray menu
 
@@ -53,7 +53,7 @@ A selection stays on one monitor. Use **All monitors** for a combined shot.
 
 ### Editor
 
-The toolbar sits next to the selection.
+The toolbar sits next to the selection. Each tool has a name under its icon. The large **Copy** button copies the picture and closes the shot.
 
 | Key | Tool |
 | --- | --- |
@@ -140,6 +140,6 @@ GIF and MP4 recording is left for v2. The hook is `IScreenRecorder` in `app/Capt
 - Scrolling capture focuses the page, moves the mouse onto it, hides its own status while the wheel is sent, waits for the scroll animation to finish, then stitches by overlap. A maximized window stays maximized. It stops at the end of the page, on `Esc`, or at 16,000 pixels. A window that does not scroll with the wheel, a page that keeps animating, or a list that recycles rows instead of moving pixels can stop the stitch early.
 - The scrollbar column is ignored. A fixed header and footer are kept from the first frame.
 - Cross-monitor drag is not supported.
-- After you finish a selection, that screen stays dimmed with the shot sitting on the spot you captured. Drag a corner to resize it or the edge to move it. One dashed line stays on the edge until you copy, save, press `Esc`, or click outside. The toolbar is next to the shot. `Esc` closes both.
+- After you finish a selection, that screen stays dimmed with the shot sitting on the spot you captured. Drag a corner to resize it or the edge to move it. One dashed line stays on the edge until you copy, save, press `Esc`, or click outside. The toolbar next to the shot names each tool, and a large Copy button copies the picture and closes the shot. `Esc` closes both.
 - `Ctrl+Alt+Shift+Esc` and the tray **Exit** command end the process from outside the window that draws the capture.
 - This build was compiled and unit-tested on Linux. The window, hotkeys, OCR, scrolling capture, and install window were not run on a Windows desktop from here. No Windows machine is connected to this session. Word boxes are mapped from the bitmap Windows OCR actually saw, then onto the picture at the display scale.

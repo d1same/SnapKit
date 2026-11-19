@@ -16,7 +16,6 @@ internal sealed class ToolbarView : Border
     private readonly TextBlock _hint;
     private readonly Border _undo;
     private readonly Border _redo;
-    private EditorTool _active = EditorTool.Arrow;
     private bool _sync;
 
     public ToolbarView(bool showFit)
@@ -24,8 +23,8 @@ internal sealed class ToolbarView : Border
         Background = Palette.Card;
         BorderBrush = Palette.Line;
         BorderThickness = new Thickness(1);
-        CornerRadius = new CornerRadius(12);
-        Padding = new Thickness(8, 7, 8, 7);
+        CornerRadius = new CornerRadius(14);
+        Padding = new Thickness(10, 8, 10, 8);
         SnapsToDevicePixels = true;
         Effect = new System.Windows.Media.Effects.DropShadowEffect
         {
@@ -36,33 +35,33 @@ internal sealed class ToolbarView : Border
         };
 
         var tools = new WrapPanel();
-        AddTool(tools, EditorTool.Select, "Select  (V)", "M3,2 L3,14 L6.2,10.2 L8.4,14.2 L10.2,13.2 L8,9.2 L12,9 Z", filled: true);
-        AddTool(tools, EditorTool.Pen, "Pen  (P)", "M12.5,1.5 L14.5,3.5 L5,13 L2,14 L3,11 Z");
-        AddTool(tools, EditorTool.Line, "Line  (L)", "M3,13 L13,3");
-        AddTool(tools, EditorTool.Arrow, "Arrow  (A)", "M2,12 L13,3 M13,3 L8,3.2 M13,3 L12.6,8");
-        AddTool(tools, EditorTool.Rectangle, "Rectangle  (R)", "M3,3 H13 V13 H3 Z");
-        AddTool(tools, EditorTool.Ellipse, "Ellipse  (E)", "M8,3.2 A4.8,4.8 0 1 0 8.1,3.2");
-        AddTool(tools, EditorTool.Highlighter, "Highlighter  (H)", "M3,11 L10,4 L13,7 L6,14 Z");
-        AddTool(tools, EditorTool.Text, "Text  (T)", "M3,3.5 H13 M8,3.5 V13 M5.2,13 H10.8");
-        AddTool(tools, EditorTool.Callout, "Callout  (C)", "M2.5,3 H12.5 V9.2 H7.2 L4.2,12.2 V9.2 H2.5 Z");
-        AddTool(tools, EditorTool.Number, "Step number  (N)", "M8,2.2 A5.8,5.8 0 1 0 8.1,2.2");
-        AddTool(tools, EditorTool.Blur, "Blur  (B)", "M3,3 H6.2 V6.2 H3 Z M9.8,3 H13 V6.2 H9.8 Z M3,9.8 H6.2 V13 H3 Z M9.8,9.8 H13 V13 H9.8 Z");
-        AddTool(tools, EditorTool.Spotlight, "Spotlight  (S)", "M2.5,2.5 H13.5 V13.5 H2.5 Z M6,6 H10 V10 H6 Z");
-        AddTool(tools, EditorTool.Crop, "Crop  (X)", "M3,6 V3 H6 M10,3 H13 V6 M13,10 V13 H10 M6,13 H3 V10");
-        AddTool(tools, EditorTool.Picker, "Pick color  (I)", "M10.8,2.2 L13.2,4.6 L6.2,11.6 L3.2,12.8 L4.4,9.8 Z");
+        AddTool(tools, EditorTool.Select, "Select", "Select or move a mark  (V)", "M7,4 L7,20 L11,16 L14.5,22 L17.5,20.5 L14,14.5 L20,14.5 Z", filled: true);
+        AddTool(tools, EditorTool.Pen, "Pen", "Draw freehand  (P)", "M4,20 L8.5,18.5 L19,8 L16,5 L5.5,15.5 Z M15.2,6.2 L17.8,8.8");
+        AddTool(tools, EditorTool.Line, "Line", "Straight line  (L)", "M5,19 L19,5");
+        AddTool(tools, EditorTool.Arrow, "Arrow", "Arrow  (A)", "M5,19 L19,5 M19,5 L12,6.2 M19,5 L17.8,12");
+        AddTool(tools, EditorTool.Rectangle, "Box", "Rectangle  (R)", "M5,5 H19 V19 H5 Z");
+        AddTool(tools, EditorTool.Ellipse, "Circle", "Ellipse  (E)", "M12,5.5 A6.5,6.5 0 1 0 12.1,5.5");
+        AddTool(tools, EditorTool.Highlighter, "Mark", "Highlighter  (H)", "M4,15 L14,5 L19,10 L9,20 Z M4,15 L7.5,18.5");
+        AddTool(tools, EditorTool.Text, "Text", "Type text  (T)", "M5,5 H19 M12,5 V19 M8,19 H16");
+        AddTool(tools, EditorTool.Callout, "Note", "Callout  (C)", "M4,4 H20 V14 H12 L8,19 V14 H4 Z");
+        AddTool(tools, EditorTool.Number, "Step", "Numbered step  (N)", "M12,4.5 A7.5,7.5 0 1 0 12.1,4.5 M12,8 V16 M9.5,10.2 L12,8");
+        AddTool(tools, EditorTool.Blur, "Blur", "Pixelate a box  (B)", "M4,4 H10 V10 H4 Z M14,4 H20 V10 H14 Z M4,14 H10 V20 H4 Z M14,14 H20 V20 H14 Z");
+        AddTool(tools, EditorTool.Spotlight, "Spot", "Dim everything outside a box  (S)", "M12,3 V6 M12,18 V21 M3,12 H6 M18,12 H21 M6,6 L8,8 M16,16 L18,18 M18,6 L16,8 M8,16 L6,18 M12,8.5 A3.5,3.5 0 1 0 12.1,8.5");
+        AddTool(tools, EditorTool.Crop, "Crop", "Keep only the dragged area  (X)", "M8,4 V8 H4 M16,4 V8 H20 M20,16 H16 V20 M4,16 H8 V20");
+        AddTool(tools, EditorTool.Picker, "Color", "Pick a color from the picture  (I)", "M14,4 L20,10 L10,20 L6,21 L7,17 Z M8,15 L13,10");
 
-        var options = new WrapPanel { Margin = new Thickness(0, 5, 0, 0) };
+        var options = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
         foreach (var swatch in Palette.Swatches)
         {
             var dot = new Border
             {
-                Width = 16,
-                Height = 16,
-                CornerRadius = new CornerRadius(8),
+                Width = 18,
+                Height = 18,
+                CornerRadius = new CornerRadius(9),
                 Background = Palette.Brush(swatch),
                 BorderBrush = Palette.Line,
                 BorderThickness = new Thickness(1),
-                Margin = new Thickness(2),
+                Margin = new Thickness(3, 4, 3, 4),
                 Cursor = Cursors.Hand,
                 ToolTip = swatch
             };
@@ -78,8 +77,8 @@ internal sealed class ToolbarView : Border
         _hex = new TextBox
         {
             Text = "#FF3B30",
-            Width = 74,
-            Height = 22,
+            Width = 78,
+            Height = 26,
             Margin = new Thickness(6, 0, 8, 0),
             Background = Brushes.Transparent,
             Foreground = Palette.Text,
@@ -105,16 +104,17 @@ internal sealed class ToolbarView : Border
 
         foreach (var size in new[] { 2d, 3d, 5d, 8d, 12d })
         {
-            var dot = new System.Windows.Shapes.Ellipse
+            var dot = new Ellipse
             {
-                Width = Math.Clamp(size + 2, 4, 14),
-                Height = Math.Clamp(size + 2, 4, 14),
+                Width = Math.Clamp(size + 2, 5, 16),
+                Height = Math.Clamp(size + 2, 5, 16),
                 Fill = Palette.Text,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
             var chip = Chip(dot, $"{size:0} px stroke", () => StrokePicked?.Invoke(size));
-            chip.Width = 22;
+            chip.Width = 28;
+            chip.Height = 28;
             _sizes[size] = chip;
             options.Children.Add(chip);
         }
@@ -125,35 +125,39 @@ internal sealed class ToolbarView : Border
             Foreground = Palette.Text,
             FontFamily = Palette.Font,
             FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        options.Children.Add(Chip(_font, "Text size", CycleFont));
+        options.Children.Add(NamedChip(_font, "Size", "Text size. Click to cycle 14, 18, 24, 32.", CycleFont, 44, 36));
 
-        _undo = Chip(Icon("M8,4.5 A4.2,4.2 0 1 0 12.2,8 M8,4.5 V7.4 M8,4.5 H5.2"), "Undo  (Ctrl+Z)", () => UndoClicked?.Invoke());
-        _redo = Chip(Icon("M8,4.5 A4.2,4.2 0 1 1 3.8,8 M8,4.5 V7.4 M8,4.5 H10.8"), "Redo  (Ctrl+Y)", () => RedoClicked?.Invoke());
+        _undo = NamedChip(Icon("M8,7 A6,6 0 1 0 14,12 M8,7 V11 M8,7 H12"), "Undo", "Undo  (Ctrl+Z)", () => UndoClicked?.Invoke(), 44, 36);
+        _redo = NamedChip(Icon("M16,7 A6,6 0 1 1 10,12 M16,7 V11 M16,7 H12"), "Redo", "Redo  (Ctrl+Y)", () => RedoClicked?.Invoke(), 44, 36);
         options.Children.Add(_undo);
         options.Children.Add(_redo);
-        options.Children.Add(Chip(Label("OCR"), "Read text in this capture", () => OcrClicked?.Invoke()));
-        options.Children.Add(Chip(Icon("M8,2.2 V9.5 M5.2,4.2 H10.8 M6,12.5 H10"), "Pin on top", () => PinClicked?.Invoke()));
-        options.Children.Add(Chip(Icon("M5,5 H11 V8 H13 L8,13 L3,8 H5 Z"), "Copy the marked-up picture  (right-click or Ctrl+C)", () => CopyClicked?.Invoke()));
-        options.Children.Add(Chip(Icon("M4,3 H10 L13,6 V13 H4 Z M10,3 V6 H13"), "Save  (Ctrl+S)", () => SaveClicked?.Invoke()));
+
+        var actions = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        actions.Children.Add(CopyButton());
+        actions.Children.Add(NamedChip(Icon("M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M8,12 H16 M8,16 H14"), "Read", "Read the text in this capture", () => OcrClicked?.Invoke(), 52, 40));
+        actions.Children.Add(NamedChip(Icon("M9,3 H15 L17,8 H19 L12,15 L5,8 H7 Z M12,15 V21"), "Pin", "Keep this picture on top of other windows", () => PinClicked?.Invoke(), 48, 40));
+        actions.Children.Add(NamedChip(Icon("M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M8,13 H16 V21 H8 Z"), "Save", "Save as PNG or JPG  (Ctrl+S)", () => SaveClicked?.Invoke(), 52, 40));
         if (showFit)
-            options.Children.Add(Chip(Label("Fit"), "Fit the image in the window", () => FitClicked?.Invoke()));
-        options.Children.Add(Chip(Label("×"), "Discard  (Esc)", () => CloseClicked?.Invoke()));
+            actions.Children.Add(NamedChip(Label("Fit"), "Fit", "Fit the image in the window", () => FitClicked?.Invoke(), 48, 40));
+        actions.Children.Add(NamedChip(Icon("M7,7 L17,17 M17,7 L7,17"), "Close", "Discard and close  (Esc)", () => CloseClicked?.Invoke(), 52, 40));
 
         _hint = new TextBlock
         {
-            Text = "Right-click copies. Esc closes the shot. Ctrl+Alt+Shift+Esc quits.",
+            Text = "Copy copies the shot and closes it. Esc closes it too.",
             Foreground = Palette.Muted,
             FontFamily = Palette.Font,
             FontSize = 11,
-            Margin = new Thickness(4, 6, 4, 0)
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(2, 8, 2, 0)
         };
 
         Child = new StackPanel
         {
-            Children = { tools, options, _hint }
+            Children = { tools, options, actions, _hint }
         };
         HighlightTool(EditorTool.Arrow);
         HighlightSize(3);
@@ -207,36 +211,95 @@ internal sealed class ToolbarView : Border
         FontPicked?.Invoke(next);
     }
 
-    private void AddTool(Panel panel, EditorTool tool, string tip, string geometry, bool filled = false)
+    private void AddTool(Panel panel, EditorTool tool, string name, string tip, string geometry, bool filled = false)
     {
-        var icon = Icon(geometry, filled);
-        var chip = Chip(icon, tip, () =>
+        var chip = NamedChip(Icon(geometry, filled), name, tip, () =>
         {
-            if (_sync) return;
+            if (_sync)
+                return;
             ToolPicked?.Invoke(tool);
-        });
+        }, 54, 48);
         _tools[tool] = chip;
         panel.Children.Add(chip);
     }
 
+    private Border CopyButton()
+    {
+        var label = new TextBlock
+        {
+            Text = "Copy",
+            Foreground = Palette.Ink,
+            FontFamily = Palette.Font,
+            FontSize = 16,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0)
+        };
+        var icon = Icon("M8,8 H18 V20 H8 Z M6,6 H16 V8", filled: false);
+        icon.Stroke = Palette.Ink;
+        icon.Width = 18;
+        icon.Height = 18;
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        row.Children.Add(icon);
+        row.Children.Add(label);
+        var button = new Border
+        {
+            MinWidth = 148,
+            Height = 44,
+            Margin = new Thickness(2, 2, 8, 2),
+            Padding = new Thickness(16, 0, 18, 0),
+            CornerRadius = new CornerRadius(12),
+            Background = Palette.Text,
+            Child = row,
+            ToolTip = "Copy the picture and close the shot  (Ctrl+C)",
+            Cursor = Cursors.Hand,
+            SnapsToDevicePixels = true
+        };
+        button.MouseEnter += (_, _) => button.Opacity = 0.86;
+        button.MouseLeave += (_, _) => button.Opacity = 1;
+        button.MouseLeftButtonUp += (_, e) =>
+        {
+            CopyClicked?.Invoke();
+            e.Handled = true;
+        };
+        return button;
+    }
+
     private void HighlightTool(EditorTool tool)
     {
-        _active = tool;
         foreach (var (key, chip) in _tools)
+            PaintChip(chip, key == tool);
+    }
+
+    private static void PaintChip(Border chip, bool on)
+    {
+        chip.Background = on ? Palette.Text : Brushes.Transparent;
+        PaintInk(chip, on ? Palette.Ink : Palette.Text);
+    }
+
+    private static void PaintInk(DependencyObject node, Brush ink)
+    {
+        if (node is Shape shape)
         {
-            bool on = key == tool;
-            chip.Background = on ? Palette.Text : Brushes.Transparent;
-            if (chip.Child is Shape shape)
-            {
-                var ink = on ? Palette.Ink : Palette.Text;
-                shape.Stroke = ink;
-                if (shape.Fill != null && shape.Fill != Brushes.Transparent)
-                    shape.Fill = ink;
-            }
-            else if (chip.Child is TextBlock block)
-            {
-                block.Foreground = on ? Palette.Ink : Palette.Text;
-            }
+            shape.Stroke = ink;
+            if (shape.Fill != null && shape.Fill != Brushes.Transparent)
+                shape.Fill = ink;
+        }
+        else if (node is TextBlock block)
+        {
+            block.Foreground = ink;
+        }
+
+        int count = VisualTreeHelper.GetChildrenCount(node);
+        for (int i = 0; i < count; i++)
+        {
+            if (VisualTreeHelper.GetChild(node, i) is DependencyObject child)
+                PaintInk(child, ink);
         }
     }
 
@@ -253,13 +316,35 @@ internal sealed class ToolbarView : Border
             chip.Background = Math.Abs(size - nearest) < 0.1 ? Palette.Elevated : Brushes.Transparent;
     }
 
+    private Border NamedChip(UIElement icon, string name, string tip, Action click, double width, double height)
+    {
+        var caption = new TextBlock
+        {
+            Text = name,
+            Foreground = Palette.Text,
+            FontFamily = Palette.Font,
+            FontSize = 10,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 1, 0, 0)
+        };
+        var stack = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        stack.Children.Add(icon);
+        stack.Children.Add(caption);
+        var chip = Chip(stack, tip, click);
+        chip.Width = width;
+        chip.Height = height;
+        return chip;
+    }
+
     private static Border Chip(UIElement content, string tip, Action click)
     {
         var chip = new Border
         {
-            Width = 32,
-            Height = 32,
-            Margin = new Thickness(1),
+            Margin = new Thickness(2),
             CornerRadius = new CornerRadius(8),
             Background = Brushes.Transparent,
             Child = content,
@@ -291,17 +376,16 @@ internal sealed class ToolbarView : Border
         {
             Data = Geometry.Parse(geometry),
             Stroke = Palette.Text,
-            StrokeThickness = 1.4,
+            StrokeThickness = 1.7,
             Fill = filled ? Palette.Text : Brushes.Transparent,
             Stretch = Stretch.Uniform,
-            Width = 16,
-            Height = 16,
+            Width = 18,
+            Height = 18,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
-            StrokeLineJoin = PenLineJoin.Round,
-            Margin = new Thickness(8)
+            StrokeLineJoin = PenLineJoin.Round
         };
     }
 
@@ -310,7 +394,8 @@ internal sealed class ToolbarView : Border
         Text = text,
         Foreground = Palette.Text,
         FontFamily = Palette.Font,
-        FontSize = text == "×" ? 16 : 11,
+        FontSize = 12,
+        FontWeight = FontWeights.SemiBold,
         HorizontalAlignment = HorizontalAlignment.Center,
         VerticalAlignment = VerticalAlignment.Center
     };
