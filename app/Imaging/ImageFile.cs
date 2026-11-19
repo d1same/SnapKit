@@ -52,6 +52,7 @@ internal static class ImageFile
     {
         bool wasTopmost = owner.Topmost;
         owner.Topmost = false;
+        using var pauseClickAway = ClickAway.Pause(owner);
         try
         {
             var dialog = new Microsoft.Win32.SaveFileDialog

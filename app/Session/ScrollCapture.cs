@@ -22,13 +22,15 @@ internal static class ScrollCapture
         PixelBuffer? result = null;
         try
         {
+            // Restore only a minimized window. SW_RESTORE on a maximized window
+            // shrinks it back to the restored size and the stitch grabs that.
             NativeMethods.keybd_event(0x12, 0, 0, UIntPtr.Zero);
-            NativeMethods.ShowWindow(hwnd, NativeMethods.SwRestore);
+            if (NativeMethods.IsIconic(hwnd))
+                NativeMethods.ShowWindow(hwnd, NativeMethods.SwRestore);
             NativeMethods.SetForegroundWindow(hwnd);
             NativeMethods.keybd_event(0x12, 0, NativeMethods.KeyEventKeyUp, UIntPtr.Zero);
-            await Task.Delay(140, token);
 
-            var bounds = WindowFinder.GetBounds(hwnd);
+            var bounds = await WaitForStableBounds(hwnd, token);
             if (bounds.Width < 40 || bounds.Height < 40)
                 return null;
 
@@ -43,6 +45,8 @@ internal static class ScrollCapture
             await Wheel(hwnd, bounds, notches, token);
             bounds = WindowFinder.GetBounds(hwnd);
             var second = await Grab(hwnd, bounds, status, token);
+            if (second.Width != first.Width || second.Height != first.Height)
+                return first;
             var band = ImageStitcher.DetectChangedBand(first, second, ignore);
             var match = band.IsEmpty
                 ? new ImageStitcher.ScrollMatch(false, 0, 0)
@@ -50,7 +54,10 @@ internal static class ScrollCapture
             if (!match.Success)
             {
                 await Task.Delay(200, token);
+                bounds = WindowFinder.GetBounds(hwnd);
                 second = await Grab(hwnd, bounds, status, token);
+                if (second.Width != first.Width || second.Height != first.Height)
+                    return first;
                 band = ImageStitcher.DetectChangedBand(first, second, ignore);
                 if (!band.IsEmpty)
                     match = ImageStitcher.FindScroll(first, second, band, ignore);
@@ -150,6 +157,20 @@ internal static class ScrollCapture
         IntPtr lParam = (IntPtr)(((point.Y & 0xFFFF) << 16) | (point.X & 0xFFFF));
         NativeMethods.PostMessage(target, NativeMethods.WmMouseWheel, wParam, lParam);
         await Task.Delay(300, token);
+    }
+
+    private static async Task<NativeMethods.Rect> WaitForStableBounds(IntPtr hwnd, CancellationToken token)
+    {
+        var bounds = WindowFinder.GetBounds(hwnd);
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            await Task.Delay(70, token);
+            var next = WindowFinder.GetBounds(hwnd);
+            if (next.Width == bounds.Width && next.Height == bounds.Height && next.Left == bounds.Left && next.Top == bounds.Top)
+                return next;
+            bounds = next;
+        }
+        return bounds;
     }
 
     private static void MoveCursor(NativeMethods.Rect bounds, ImageStitcher.ChangeBand? band)

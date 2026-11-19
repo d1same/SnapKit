@@ -54,7 +54,10 @@ internal sealed class CaptureCoordinator
 
             if (purpose != OverlayPurpose.Scroll)
                 Feedback(shots.Select(shot => shot.Monitor));
-            var session = new OverlaySession(shots, mode, purpose);
+            var session = new OverlaySession(shots, mode, purpose)
+            {
+                CloseOnClickAway = () => _state.Settings.CloseOnClickAway
+            };
             session.Finished += pick => OnOverlayFinished(session, purpose, pick);
             foreach (var shot in shots)
             {
@@ -91,7 +94,7 @@ internal sealed class CaptureCoordinator
         {
             var image = pick.Image;
             System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                OcrFlow.Start(image, message => _state.Tray?.Balloon(Brand.Name, message), null)));
+                OcrFlow.Start(image, message => _state.Tray?.Balloon(Brand.Name, message), null, () => _state.Settings.CloseOnClickAway)));
             return;
         }
         InPlaceEditorWindow? editor = null;

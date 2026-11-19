@@ -16,6 +16,7 @@ public sealed class AppSettings
     public int Revision { get; set; }
     public bool CaptureFlash { get; set; } = true;
     public bool ShutterSound { get; set; }
+    public bool CloseOnClickAway { get; set; } = true;
 
     // v2 can add a Record gesture next to these without changing the file shape much.
 

@@ -7,7 +7,7 @@ internal static class OcrFlow
 {
     private static int _busy;
 
-    public static void Start(PixelBuffer image, Action<string>? status, Window? owner)
+    public static void Start(PixelBuffer image, Action<string>? status, Window? owner, Func<bool>? closeOnClickAway = null)
     {
         if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0)
         {
@@ -29,10 +29,10 @@ internal static class OcrFlow
 
         Unstick(owner);
         status?.Invoke("Reading text…");
-        _ = Finish(snapshot, status, owner);
+        _ = Finish(snapshot, status, owner, closeOnClickAway);
     }
 
-    private static async Task Finish(PixelBuffer snapshot, Action<string>? status, Window? owner)
+    private static async Task Finish(PixelBuffer snapshot, Action<string>? status, Window? owner, Func<bool>? closeOnClickAway)
     {
         try
         {
@@ -48,11 +48,11 @@ internal static class OcrFlow
                 throw new TimeoutException("OCR took too long. You can keep editing.");
             }
             var page = await work;
-            Present(owner, snapshot, page, null, status);
+            Present(owner, snapshot, page, null, status, closeOnClickAway);
         }
         catch (Exception ex)
         {
-            Present(owner, snapshot, null, ex.Message, status);
+            Present(owner, snapshot, null, ex.Message, status, closeOnClickAway);
         }
         finally
         {
@@ -61,7 +61,7 @@ internal static class OcrFlow
         }
     }
 
-    private static void Present(Window? owner, PixelBuffer image, OcrPage? page, string? error, Action<string>? status)
+    private static void Present(Window? owner, PixelBuffer image, OcrPage? page, string? error, Action<string>? status, Func<bool>? closeOnClickAway)
     {
         void Show()
         {
@@ -72,6 +72,10 @@ internal static class OcrFlow
                 Window window = error != null || page == null
                     ? new OcrWindow("", error ?? "OCR failed.")
                     : new OcrSelectWindow(image, page);
+                ClickAway.Attach(window, window.Close, closeOnClickAway ?? (() => false));
+                var pause = owner == null ? null : ClickAway.Pause(owner);
+                if (pause != null)
+                    window.Closed += (_, _) => pause.Dispose();
                 window.Show();
                 window.Activate();
             }

@@ -52,6 +52,7 @@ internal sealed class OverlaySession
     public event Action<CapturePick?>? Finished;
     public event Action? Dismissed;
     public event Action? FocusEditor;
+    public Func<bool> CloseOnClickAway { get; set; } = () => false;
 
     public void Add(OverlayWindow window) => _windows.Add(window);
 
@@ -374,7 +375,10 @@ internal sealed class OverlayWindow : Window
         if (_frozen && msg == NativeMethods.WmMouseActivate)
         {
             handled = true;
-            _session.RaiseFocusEditor();
+            if (_session.CloseOnClickAway())
+                _session.Dismiss();
+            else
+                _session.RaiseFocusEditor();
             return new IntPtr(NativeMethods.MaNoActivate);
         }
         return IntPtr.Zero;

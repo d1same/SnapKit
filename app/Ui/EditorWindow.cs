@@ -54,6 +54,7 @@ internal sealed class EditorWindow : Window
         SourceInitialized += (_, _) => WindowChrome.UseDarkTitle(this);
         Loaded += (_, _) => Dispatcher.BeginInvoke(Fit, System.Windows.Threading.DispatcherPriority.ContextIdle);
         PreviewKeyDown += (_, e) => EditorKeys.Handle(e, _session, _surface, Discard, Fit);
+        ClickAway.Attach(this, Discard, () => _session.State.Settings.CloseOnClickAway);
         PreviewMouseWheel += OnWheel;
         Closed += (_, _) =>
         {
@@ -121,7 +122,7 @@ internal sealed class EditorWindow : Window
         _toolbar.OcrClicked += () =>
         {
             _surface.CommitEditing();
-            OcrFlow.Start(_session.Document.ComposeUnderlay(), _session.Flash, this);
+            OcrFlow.Start(_session.Document.ComposeUnderlay(), _session.Flash, this, () => _session.State.Settings.CloseOnClickAway);
         };
         _toolbar.PinClicked += Pin;
         _toolbar.CloseClicked += Discard;

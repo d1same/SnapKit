@@ -11,6 +11,7 @@ public class SettingsTests
         settings.ShutterSound = true;
         settings.CaptureFlash = false;
         settings.StartWithWindows = true;
+        settings.CloseOnClickAway = false;
         settings.Ocr = new HotkeyGesture { VirtualKey = 0x4F, Ctrl = true, Shift = true };
 
         var path = Path.Combine(Path.GetTempPath(), "snapkit-settings-" + Guid.NewGuid().ToString("N") + ".json");
@@ -21,6 +22,7 @@ public class SettingsTests
             Assert.True(loaded.ShutterSound);
             Assert.False(loaded.CaptureFlash);
             Assert.True(loaded.StartWithWindows);
+            Assert.False(loaded.CloseOnClickAway);
             Assert.True(loaded.Ocr.EqualsGesture(settings.Ocr));
             Assert.Equal(0x2C, loaded.Area.VirtualKey);
             Assert.False(loaded.Area.Shift);
@@ -42,7 +44,9 @@ public class SettingsTests
             var loaded = SettingsStore.Load(path);
             Assert.True(loaded.StartWithWindows);
             Assert.False(loaded.CaptureFlash);
+            Assert.True(loaded.CloseOnClickAway);
             Assert.True(AppSettings.CreateDefault().StartWithWindows);
+            Assert.True(AppSettings.CreateDefault().CloseOnClickAway);
 
             File.WriteAllText(path, "{ \"startWithWindows\": false }");
             Assert.True(SettingsStore.Load(path).StartWithWindows);

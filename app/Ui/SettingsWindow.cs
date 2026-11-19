@@ -45,6 +45,11 @@ internal sealed class SettingsWindow : Window
             state.Settings.ShutterSound = value;
             state.SaveSettings();
         }));
+        stack.Children.Add(Check("Close the shot when you click outside it", state.Settings.CloseOnClickAway, value =>
+        {
+            state.Settings.CloseOnClickAway = value;
+            state.SaveSettings();
+        }));
 
         _note = new TextBlock
         {

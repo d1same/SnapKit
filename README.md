@@ -8,9 +8,9 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit. The file host blocks a raw `.exe`, so this is a zip of that one file.
 
-[SnapKit-win-x64.zip](https://qu.ax/rmU6Q)
+[SnapKit-win-x64.zip](https://qu.ax/iDrFg)
 
-Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (64 MB). The link lasts until **19 Dec 2026, 12:11 AM ET**. Unzip it and run `SnapKit.exe` once.
+Open that page and click **Download**. The file is `SnapKit-win-x64.zip` (64 MB). The link lasts until **19 Dec 2026, 12:27 AM ET**. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip closes whatever SnapKit is already running and replaces it.
 
@@ -45,7 +45,7 @@ A bar stays at the top of the screen: the tab or folder, the window, and **Entir
 - `Enter` captures the highlighted target, or the monitor in full-screen mode.
 - `Esc` or right-click cancels.
 
-The shot stays where you took it. The rest of that screen stays dimmed behind it, so arrows and callouts point at the real window. `Esc` closes the editor and the dimmed screen. `Ctrl+Alt+Shift+Esc` quits SnapKit if a window is stuck.
+The shot stays where you took it. The rest of that screen stays dimmed behind it, so arrows and callouts point at the real window. Click that dimmed area, or anywhere outside the shot, and the shot closes. Turn that off in Settings if you want a click there to leave the shot open. `Esc` closes the editor and the dimmed screen. `Ctrl+Alt+Shift+Esc` quits SnapKit if a window is stuck.
 
 A selection stays on one monitor. Use **All monitors** for a combined shot.
 
@@ -102,7 +102,7 @@ These are the defaults. Change them in Settings. They are stored in `%APPDATA%\S
 
 Windows 11 often gives `PrtSc` to the Snipping Tool. Turn that off in Windows Settings, then set SnapKit's keys again if a shortcut fails to register.
 
-Settings also has **start with Windows** (on), a short white flash after a capture, and a shutter sound. Flash is on. Sound is off. On Windows 11 the tray icon is placed next to the clock. If it still lands in the overflow, open Settings → Personalization → Taskbar → Other system tray icons and turn SnapKit on.
+Settings also has **start with Windows** (on), **close the shot when you click outside it** (on), a short white flash after a capture, and a shutter sound. Flash is on. Sound is off. On Windows 11 the tray icon is placed next to the clock. If it still lands in the overflow, open Settings → Personalization → Taskbar → Other system tray icons and turn SnapKit on.
 
 ## Change the name
 
@@ -135,7 +135,7 @@ GIF and MP4 recording is left for v2. The hook is `IScreenRecorder` in `app/Capt
 - Recent captures keep the last 10 shots in memory. They are gone when SnapKit exits.
 - Closing, copying, saving, or pinning bakes the marks into the recent item. Reopening it is a flat image.
 - `Esc` in the editor throws away the marks. The original crop stays in Recent.
-- Scrolling capture moves the mouse onto the window, scrolls with the wheel, and stitches by overlap. It stops at the end of the page, on `Esc`, or at 16,000 pixels. A window that does not scroll with the wheel, or a page that keeps animating, can stop the stitch early.
+- Scrolling capture moves the mouse onto the window, scrolls with the wheel, and stitches by overlap. A maximized window stays maximized. It stops at the end of the page, on `Esc`, or at 16,000 pixels. A window that does not scroll with the wheel, or a page that keeps animating, can stop the stitch early.
 - The scrollbar column is ignored. A fixed header and footer are kept from the first frame.
 - Cross-monitor drag is not supported.
 - After you finish a selection, that screen stays dimmed with the shot sitting on the spot you captured. The toolbar is next to the shot. `Esc` closes both.

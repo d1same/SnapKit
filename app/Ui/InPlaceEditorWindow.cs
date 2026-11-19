@@ -48,6 +48,7 @@ internal sealed class InPlaceEditorWindow : Window
             Opacity = 1;
         };
         PreviewKeyDown += (_, e) => EditorKeys.Handle(e, _session, _surface, Discard, null);
+        ClickAway.Attach(this, Discard, () => _session.State.Settings.CloseOnClickAway);
         Closed += (_, _) =>
         {
             if (!_discard)
@@ -116,7 +117,7 @@ internal sealed class InPlaceEditorWindow : Window
         _toolbar.OcrClicked += () =>
         {
             _surface.CommitEditing();
-            OcrFlow.Start(_session.Document.ComposeUnderlay(), _session.Flash, this);
+            OcrFlow.Start(_session.Document.ComposeUnderlay(), _session.Flash, this, () => _session.State.Settings.CloseOnClickAway);
         };
         _toolbar.PinClicked += Pin;
         _toolbar.CloseClicked += Discard;
