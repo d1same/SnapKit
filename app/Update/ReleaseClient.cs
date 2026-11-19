@@ -13,7 +13,7 @@ internal static class ReleaseClient
     public const string Owner = "d1same";
     public const string Repo = "SnapKit";
 
-    public static Version Current => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 1, 3);
+    public static Version Current => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 1, 4);
 
     public static string Display
     {

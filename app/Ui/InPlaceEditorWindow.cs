@@ -56,6 +56,7 @@ internal sealed class InPlaceEditorWindow : Window
         };
         PreviewKeyDown += (_, e) => EditorKeys.Handle(e, _session, _surface, Discard, null);
         ClickAway.Attach(this, Discard, () => _session.State.Settings.CloseOnClickAway);
+        _session.Delivered += () => Dispatcher.BeginInvoke(Discard);
         Closed += (_, _) =>
         {
             if (!_discard)

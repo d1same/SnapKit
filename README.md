@@ -8,13 +8,13 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit.
 
-[SnapKit 0.1.3](https://github.com/d1same/SnapKit/releases/tag/v0.1.3)
+[SnapKit 0.1.4](https://github.com/d1same/SnapKit/releases/tag/v0.1.4)
 
 Download `SnapKit-win-x64.zip` from that release. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. A window stays on screen while it copies, so the install is not a silent pause. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip shows **Updating SnapKit**, closes whatever SnapKit is already running, and replaces it.
 
-This build is **0.1.3**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, an update window names both versions. **Update** downloads the zip, and the new copy shows the same install window while it replaces the old one. Settings also has **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
+This build is **0.1.4**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, an update window names both versions. **Update** downloads the zip, and the new copy shows the same install window while it replaces the old one. Settings also has **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -47,7 +47,7 @@ A bar stays at the top of the screen: the tab or folder, the window, and **Entir
 - `Enter` captures the highlighted target, or the monitor in full-screen mode.
 - `Esc` or right-click cancels.
 
-The shot stays where you took it. The rest of that screen is darkened, and one dashed line stays on the edge of the shot until you press `Esc` or click outside it. Turn click-away off in Settings if you want a click there to leave the shot open. `Ctrl+Alt+Shift+Esc` quits SnapKit if a window is stuck.
+The shot stays where you took it. The rest of that screen is darkened, and one dashed line stays on the edge of the shot until you copy it, save it, press `Esc`, or click outside it. Turn click-away off in Settings if you want a click there to leave the shot open. `Ctrl+Alt+Shift+Esc` quits SnapKit if a window is stuck.
 
 A selection stays on one monitor. Use **All monitors** for a combined shot.
 
@@ -76,9 +76,9 @@ The toolbar sits next to the selection.
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` or `Ctrl+Shift+Z` | Redo |
 | `Delete` | Remove the selected mark |
-| Right-click | Copy the marked-up picture |
-| `Ctrl+C` | Copy the picture |
-| `Ctrl+S` | Save as PNG or JPG |
+| Right-click | Copy the marked-up picture and close the shot |
+| `Ctrl+C` | Copy the picture and close the shot |
+| `Ctrl+S` | Save as PNG or JPG, then close the shot |
 | `Esc` | Discard the edits and close |
 
 Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` while typing cancels that edit.
@@ -140,6 +140,6 @@ GIF and MP4 recording is left for v2. The hook is `IScreenRecorder` in `app/Capt
 - Scrolling capture focuses the page, moves the mouse onto it, hides its own status while the wheel is sent, waits for the scroll animation to finish, then stitches by overlap. A maximized window stays maximized. It stops at the end of the page, on `Esc`, or at 16,000 pixels. A window that does not scroll with the wheel, a page that keeps animating, or a list that recycles rows instead of moving pixels can stop the stitch early.
 - The scrollbar column is ignored. A fixed header and footer are kept from the first frame.
 - Cross-monitor drag is not supported.
-- After you finish a selection, that screen stays dimmed with the shot sitting on the spot you captured. One dashed line stays on the edge of the shot until `Esc` or a click outside. The toolbar is next to the shot. `Esc` closes both.
+- After you finish a selection, that screen stays dimmed with the shot sitting on the spot you captured. One dashed line stays on the edge of the shot until you copy, save, press `Esc`, or click outside. The toolbar is next to the shot. `Esc` closes both.
 - `Ctrl+Alt+Shift+Esc` and the tray **Exit** command end the process from outside the window that draws the capture.
 - This build was compiled and unit-tested on Linux. The window, hotkeys, OCR, scrolling capture, and install window were not run on a Windows desktop from here. No Windows machine is connected to this session. Word boxes are mapped from the bitmap Windows OCR actually saw, then onto the picture at the display scale.

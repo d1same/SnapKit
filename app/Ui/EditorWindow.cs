@@ -55,6 +55,7 @@ internal sealed class EditorWindow : Window
         Loaded += (_, _) => Dispatcher.BeginInvoke(Fit, System.Windows.Threading.DispatcherPriority.ContextIdle);
         PreviewKeyDown += (_, e) => EditorKeys.Handle(e, _session, _surface, Discard, Fit);
         ClickAway.Attach(this, Discard, () => _session.State.Settings.CloseOnClickAway);
+        _session.Delivered += () => Dispatcher.BeginInvoke(Discard);
         PreviewMouseWheel += OnWheel;
         Closed += (_, _) =>
         {
