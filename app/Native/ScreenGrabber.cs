@@ -15,14 +15,9 @@ internal static class ScreenGrabber
         IntPtr previous = IntPtr.Zero;
         try
         {
-            memory = NativeMethods.CreateCompatibleDC(screen);
-            bitmap = NativeMethods.CreateCompatibleBitmap(screen, width, height);
-            previous = NativeMethods.SelectObject(memory, bitmap);
-            NativeMethods.BitBlt(memory, 0, 0, width, height, screen, x, y, NativeMethods.SrcCopy);
-            // GetDIBits fails when the bitmap is still selected into a DC.
-            NativeMethods.SelectObject(memory, previous);
-            previous = IntPtr.Zero;
-
+            // Color management on the screen DC shifts the copied colors. Turn it off,
+            // and blit straight into a 32-bit DIB so the bytes stay the screen's BGRA.
+            NativeMethods.SetICMMode(screen, NativeMethods.IcmOff);
             var info = new NativeMethods.BitmapInfo
             {
                 bmiHeader = new NativeMethods.BitmapInfoHeader
@@ -32,11 +27,29 @@ internal static class ScreenGrabber
                     Height = -height,
                     Planes = 1,
                     BitCount = 32,
+                    Compression = 0,
                     SizeImage = width * height * 4
                 }
             };
+            bitmap = NativeMethods.CreateDIBSection(screen, ref info, 0, out var bits, IntPtr.Zero, 0);
             var pixels = new byte[width * height * 4];
-            NativeMethods.GetDIBits(screen, bitmap, 0, (uint)height, pixels, ref info, 0);
+            if (bitmap != IntPtr.Zero && bits != IntPtr.Zero)
+            {
+                memory = NativeMethods.CreateCompatibleDC(screen);
+                previous = NativeMethods.SelectObject(memory, bitmap);
+                NativeMethods.BitBlt(memory, 0, 0, width, height, screen, x, y, NativeMethods.SrcCopy);
+                Marshal.Copy(bits, pixels, 0, pixels.Length);
+            }
+            else
+            {
+                memory = NativeMethods.CreateCompatibleDC(screen);
+                bitmap = NativeMethods.CreateCompatibleBitmap(screen, width, height);
+                previous = NativeMethods.SelectObject(memory, bitmap);
+                NativeMethods.BitBlt(memory, 0, 0, width, height, screen, x, y, NativeMethods.SrcCopy);
+                NativeMethods.SelectObject(memory, previous);
+                previous = IntPtr.Zero;
+                NativeMethods.GetDIBits(screen, bitmap, 0, (uint)height, pixels, ref info, 0);
+            }
             var buffer = new PixelBuffer(width, height, pixels);
             buffer.ForceOpaque();
             return buffer;

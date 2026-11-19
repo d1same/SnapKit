@@ -118,16 +118,31 @@ internal sealed class OverlayWindow : Window
 {
     private readonly OverlaySession _session;
     private readonly Image _image = new() { Stretch = Stretch.Fill, IsHitTestVisible = false };
-    private readonly Path _dim = new() { Fill = Palette.Freeze(0, 0, 0, 0x88), IsHitTestVisible = false };
-    private readonly Rectangle _selection = new()
+    private readonly Path _dim = new() { Fill = Palette.Freeze(0, 0, 0, 0x40), IsHitTestVisible = false };
+    private readonly Rectangle _selectionInk = new()
     {
-        Stroke = Brushes.White,
-        StrokeThickness = 1.5,
-        Fill = Palette.Freeze(255, 255, 255, 0x18),
+        Stroke = Brushes.Black,
+        StrokeThickness = 1.25,
+        StrokeDashArray = new DoubleCollection { 5, 4 },
+        StrokeDashOffset = 5,
+        Fill = Brushes.Transparent,
         IsHitTestVisible = false,
         Visibility = Visibility.Collapsed,
         HorizontalAlignment = HorizontalAlignment.Left,
-        VerticalAlignment = VerticalAlignment.Top
+        VerticalAlignment = VerticalAlignment.Top,
+        SnapsToDevicePixels = true
+    };
+    private readonly Rectangle _selection = new()
+    {
+        Stroke = Brushes.White,
+        StrokeThickness = 1.25,
+        StrokeDashArray = new DoubleCollection { 5, 4 },
+        Fill = Brushes.Transparent,
+        IsHitTestVisible = false,
+        Visibility = Visibility.Collapsed,
+        HorizontalAlignment = HorizontalAlignment.Left,
+        VerticalAlignment = VerticalAlignment.Top,
+        SnapsToDevicePixels = true
     };
     private readonly Border _sizePill;
     private readonly TextBlock _sizeText;
@@ -264,7 +279,7 @@ internal sealed class OverlayWindow : Window
 
         Content = new Grid
         {
-            Children = { _image, _dim, _selection, _sizePill, _loupe, _hint, _choiceHost }
+            Children = { _image, _dim, _selectionInk, _selection, _sizePill, _loupe, _hint, _choiceHost }
         };
 
         var bitmap = BitmapConvert.ToBitmapSource(shot.Pixels);
@@ -319,7 +334,7 @@ internal sealed class OverlayWindow : Window
             if (x < Shot.Pixels.Width && y < Shot.Pixels.Height && x + pick.Image.Width > 0 && y + pick.Image.Height > 0)
             {
                 ShowRect(Math.Max(0, x), Math.Max(0, y), pick.Image.Width, pick.Image.Height, null);
-                _selection.Visibility = Visibility.Collapsed;
+                HideSelection();
                 _sizePill.Visibility = Visibility.Collapsed;
                 return;
             }
@@ -362,7 +377,7 @@ internal sealed class OverlayWindow : Window
             ShowRect(0, 0, Shot.Pixels.Width, Shot.Pixels.Height, "This monitor");
         else if (!_dragging)
         {
-            _selection.Visibility = Visibility.Collapsed;
+            HideSelection();
             _sizePill.Visibility = Visibility.Collapsed;
             _loupe.Visibility = Visibility.Collapsed;
             RedrawHole(0, 0, 0, 0);
@@ -480,7 +495,7 @@ internal sealed class OverlayWindow : Window
             var window = WindowFinder.At(cursor.X, cursor.Y);
             if (window == null)
             {
-                _selection.Visibility = Visibility.Collapsed;
+                HideSelection();
                 _sizePill.Visibility = Visibility.Collapsed;
                 RedrawHole(0, 0, 0, 0);
                 return;
@@ -704,6 +719,32 @@ internal sealed class OverlayWindow : Window
         return (x, y, Math.Max(0, right - x), Math.Max(0, bottom - y));
     }
 
+    private void HideSelection()
+    {
+        _selection.Visibility = Visibility.Collapsed;
+        _selectionInk.Visibility = Visibility.Collapsed;
+    }
+
+    private void PlaceSelection(double x, double y, double w, double h, bool visible)
+    {
+        if (!visible)
+        {
+            HideSelection();
+            return;
+        }
+        var margin = new Thickness(x, y, 0, 0);
+        double width = Math.Max(0, w);
+        double height = Math.Max(0, h);
+        _selectionInk.Visibility = Visibility.Visible;
+        _selectionInk.Margin = margin;
+        _selectionInk.Width = width;
+        _selectionInk.Height = height;
+        _selection.Visibility = Visibility.Visible;
+        _selection.Margin = margin;
+        _selection.Width = width;
+        _selection.Height = height;
+    }
+
     private void ShowRect(int x, int y, int w, int h, string? label)
     {
         _selX = x;
@@ -714,10 +755,7 @@ internal sealed class OverlayWindow : Window
             return;
         double sx = ActualWidth / Shot.Pixels.Width;
         double sy = ActualHeight / Shot.Pixels.Height;
-        _selection.Visibility = w > 1 && h > 1 ? Visibility.Visible : Visibility.Collapsed;
-        _selection.Margin = new Thickness(x * sx, y * sy, 0, 0);
-        _selection.Width = Math.Max(0, w * sx);
-        _selection.Height = Math.Max(0, h * sy);
+        PlaceSelection(x * sx, y * sy, w * sx, h * sy, w > 1 && h > 1);
         _sizeText.Text = label == null ? $"{w} × {h}" : $"{Trim(label)}    ·    {w} × {h}";
         _sizePill.Visibility = Visibility.Visible;
         double pillX = x * sx + w * sx + 8;

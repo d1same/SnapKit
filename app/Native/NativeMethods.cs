@@ -6,6 +6,7 @@ namespace SnapKit;
 internal static class NativeMethods
 {
     public const int SrcCopy = 0x00CC0020;
+    public const int IcmOff = 1;
     public const int SmXVirtualScreen = 76;
     public const int SmYVirtualScreen = 77;
     public const int SmCxVirtualScreen = 78;
@@ -60,6 +61,8 @@ internal static class NativeMethods
     [DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr obj);
     [DllImport("gdi32.dll")] public static extern bool BitBlt(IntPtr hdcDest, int x, int y, int w, int h, IntPtr hdcSrc, int xSrc, int ySrc, int rop);
     [DllImport("gdi32.dll")] public static extern int GetDIBits(IntPtr hdc, IntPtr hbmp, uint start, uint lines, byte[] bits, ref BitmapInfo bmi, uint usage);
+    [DllImport("gdi32.dll")] public static extern IntPtr CreateDIBSection(IntPtr hdc, ref BitmapInfo bmi, uint usage, out IntPtr bits, IntPtr section, uint offset);
+    [DllImport("gdi32.dll")] public static extern int SetICMMode(IntPtr hdc, int mode);
     [DllImport("user32.dll")] public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr clip, MonitorEnumProc proc, IntPtr data);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfoEx info);
     [DllImport("shcore.dll")] public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
