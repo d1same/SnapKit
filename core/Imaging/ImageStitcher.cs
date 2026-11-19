@@ -89,7 +89,7 @@ public static class ImageStitcher
             }
         }
 
-        if (bestDelta <= 0 || best > 22 || best > identical * 0.72)
+        if (bestDelta <= 0 || best > 28 || best > identical * 0.8)
             return new ScrollMatch(false, 0, best);
 
         return new ScrollMatch(true, bestDelta, best);

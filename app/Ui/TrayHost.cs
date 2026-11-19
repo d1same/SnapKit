@@ -43,7 +43,7 @@ internal sealed class TrayHost : IDisposable
         {
             Icon = IconFactory.Load(),
             Visible = true,
-            Text = Brand.Name + " — click to capture",
+            Text = Brand.Name + " " + ReleaseClient.Display,
             ContextMenuStrip = _menu
         };
         _icon.MouseUp += (_, e) =>

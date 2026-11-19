@@ -16,7 +16,7 @@ internal sealed class SettingsWindow : Window
         _state = state;
         Title = Brand.Name + " settings";
         Width = 560;
-        Height = 520;
+        Height = 620;
         MinWidth = 480;
         MinHeight = 420;
         Background = Palette.Bg;
@@ -50,6 +50,29 @@ internal sealed class SettingsWindow : Window
             state.Settings.CloseOnClickAway = value;
             state.SaveSettings();
         }));
+
+        stack.Children.Add(Heading("Updates"));
+        stack.Children.Add(Hint("Version " + ReleaseClient.Display + ". SnapKit checks GitHub for a newer release of " + ReleaseClient.Owner + "/" + ReleaseClient.Repo + "."));
+        var check = new Button
+        {
+            Content = "Check for updates",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 8, 0, 0),
+            Padding = new Thickness(12, 6, 12, 6),
+            Background = Palette.Elevated,
+            Foreground = Palette.Text,
+            BorderBrush = Palette.Line,
+            FontFamily = Palette.Font
+        };
+        check.Click += async (_, _) =>
+        {
+            check.IsEnabled = false;
+            check.Content = "Checking…";
+            await UpdateWindow.CheckNow(this);
+            check.Content = "Check for updates";
+            check.IsEnabled = true;
+        };
+        stack.Children.Add(check);
 
         _note = new TextBlock
         {

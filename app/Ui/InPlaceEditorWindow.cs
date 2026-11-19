@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 
 namespace SnapKit;
 
@@ -10,6 +11,8 @@ internal sealed class InPlaceEditorWindow : Window
     private readonly EditorSession _session;
     private readonly ShotSurface _surface;
     private readonly ToolbarView _toolbar;
+    private readonly Rectangle _frameInk;
+    private readonly Rectangle _frame;
     private readonly MonitorInfo _monitor;
     private readonly int _originX;
     private readonly int _originY;
@@ -36,9 +39,13 @@ internal sealed class InPlaceEditorWindow : Window
 
         _surface = new ShotSurface(session.Document);
         _toolbar = new ToolbarView(showFit: false);
+        _frameInk = Dash(Brushes.Black, 2.75);
+        _frame = Dash(Brushes.White, 0);
         Wire();
         var canvas = new Canvas { Background = Brushes.Transparent };
         canvas.Children.Add(_surface);
+        canvas.Children.Add(_frameInk);
+        canvas.Children.Add(_frame);
         canvas.Children.Add(_toolbar);
         Content = canvas;
         session.Document.Changed += () => Dispatcher.BeginInvoke(PlaceIfViewChanged);
@@ -177,8 +184,14 @@ internal sealed class InPlaceEditorWindow : Window
 
         int imageX = Math.Clamp(screenX - winX, 0, Math.Max(0, winW - 1));
         int imageY = Math.Clamp(screenY - winY, 0, Math.Max(0, winH - 1));
-        Canvas.SetLeft(_surface, imageX / scale);
-        Canvas.SetTop(_surface, imageY / scale);
+        double imageLeft = imageX / scale;
+        double imageTop = imageY / scale;
+        double imageWidth = imgW / scale;
+        double imageHeight = imgH / scale;
+        Canvas.SetLeft(_surface, imageLeft);
+        Canvas.SetTop(_surface, imageTop);
+        PlaceFrame(_frameInk, imageLeft, imageTop, imageWidth, imageHeight);
+        PlaceFrame(_frame, imageLeft, imageTop, imageWidth, imageHeight);
 
         double toolX = imageX / scale;
         double toolY = below
@@ -190,8 +203,30 @@ internal sealed class InPlaceEditorWindow : Window
             toolY = Math.Max(0, winH / scale - _toolbar.DesiredSize.Height);
         Canvas.SetLeft(_toolbar, Math.Max(0, toolX));
         Canvas.SetTop(_toolbar, toolY);
+        Panel.SetZIndex(_toolbar, 8);
         Topmost = true;
         WindowChrome.Place(this, winX, winY, winW, winH, scale, topmost: true, activate: true, inTaskbar: true);
+    }
+
+    private static Rectangle Dash(Brush stroke, double offset) => new()
+    {
+        Stroke = stroke,
+        StrokeThickness = 2.5,
+        StrokeDashArray = new DoubleCollection { 3, 2.4 },
+        StrokeDashOffset = offset,
+        Fill = Brushes.Transparent,
+        IsHitTestVisible = false,
+        SnapsToDevicePixels = true
+    };
+
+    private static void PlaceFrame(Rectangle frame, double left, double top, double width, double height)
+    {
+        const double inset = 2;
+        Canvas.SetLeft(frame, left + inset);
+        Canvas.SetTop(frame, top + inset);
+        frame.Width = Math.Max(1, width - inset * 2);
+        frame.Height = Math.Max(1, height - inset * 2);
+        Panel.SetZIndex(frame, 4);
     }
 
     private void Pin()

@@ -29,12 +29,13 @@ internal static class ScrollCapture
                 NativeMethods.ShowWindow(hwnd, NativeMethods.SwRestore);
             NativeMethods.SetForegroundWindow(hwnd);
             NativeMethods.keybd_event(NativeMethods.VkMenu, 0, NativeMethods.KeyEventKeyUp, UIntPtr.Zero);
+            FocusTarget(hwnd);
 
             var bounds = await WaitForStableBounds(hwnd, token);
             if (bounds.Width < 40 || bounds.Height < 40)
                 return null;
 
-            int notches = 2;
+            int notches = 1;
             int ignore = Math.Max(28, bounds.Width / 18);
             bool posted = false;
             MoveCursor(bounds, null);
@@ -43,26 +44,33 @@ internal static class ScrollCapture
             var first = await SettledGrab(hwnd, bounds, status, token);
             result = first;
             status.Report("Scrolling…");
+            var anchor = first;
             PixelBuffer second = first;
             var band = ImageStitcher.ChangeBand.Empty;
             var match = new ImageStitcher.ScrollMatch(false, 0, 0);
-            for (var attempt = 0; attempt < 3 && !match.Success; attempt++)
+            for (var attempt = 0; attempt < 4 && !match.Success; attempt++)
             {
                 if (attempt == 1)
                     posted = true;
-                await Wheel(hwnd, bounds, attempt == 0 ? notches : 1, posted, token);
+                await Wheel(hwnd, bounds, notches, posted, status, token);
                 bounds = WindowFinder.GetBounds(hwnd);
                 second = await SettledGrab(hwnd, bounds, status, token);
-                if (second.Width != first.Width || second.Height != first.Height)
-                    return first;
-                if (MeanDelta(first, second) < 2.5)
+                if (second.Width != anchor.Width || second.Height != anchor.Height)
+                    return result;
+                if (MeanDelta(anchor, second) < 2.5)
+                {
+                    notches = Math.Min(4, notches + 1);
                     continue;
-                band = ImageStitcher.DetectChangedBand(first, second, ignore);
+                }
+                band = ImageStitcher.DetectChangedBand(anchor, second, ignore);
                 if (!band.IsEmpty)
-                    match = ImageStitcher.FindScroll(first, second, band, ignore);
+                    match = ImageStitcher.FindScroll(anchor, second, band, ignore);
+                if (!match.Success)
+                    anchor = second;
             }
             if (band.IsEmpty || !match.Success)
-                return first;
+                return result;
+            first = anchor;
 
             PixelBuffer? header = band.Top > 0 ? first.Crop(0, 0, first.Width, band.Top) : null;
             int footerHeight = first.Height - band.Bottom;
@@ -83,7 +91,7 @@ internal static class ScrollCapture
                 else if (match.Delta > band.Height * 0.5)
                     notches = Math.Max(1, notches - 1);
 
-                await Wheel(hwnd, bounds, notches, posted, token);
+                await Wheel(hwnd, bounds, notches, posted, status, token);
                 var now = WindowFinder.GetBounds(hwnd);
                 if (Math.Abs(now.Width - bounds.Width) > 4 || Math.Abs(now.Height - bounds.Height) > 4)
                     break;
@@ -174,14 +182,31 @@ internal static class ScrollCapture
         return count == 0 ? 999 : sum / (double)count;
     }
 
-    private static async Task Wheel(IntPtr hwnd, NativeMethods.Rect bounds, int notches, bool posted, CancellationToken token)
+    private static void FocusTarget(IntPtr hwnd)
     {
+        IntPtr foreground = NativeMethods.GetForegroundWindow();
+        uint foregroundThread = NativeMethods.GetWindowThreadProcessId(foreground, out _);
+        uint targetThread = NativeMethods.GetWindowThreadProcessId(hwnd, out _);
+        uint current = NativeMethods.GetCurrentThreadId();
+        bool attachedForeground = foregroundThread != 0 && foregroundThread != current && NativeMethods.AttachThreadInput(current, foregroundThread, true);
+        bool attachedTarget = targetThread != 0 && targetThread != current && targetThread != foregroundThread && NativeMethods.AttachThreadInput(current, targetThread, true);
+        NativeMethods.ShowWindow(hwnd, 5);
+        NativeMethods.SetForegroundWindow(hwnd);
+        if (attachedForeground)
+            NativeMethods.AttachThreadInput(current, foregroundThread, false);
+        if (attachedTarget)
+            NativeMethods.AttachThreadInput(current, targetThread, false);
+    }
+
+    private static async Task Wheel(IntPtr hwnd, NativeMethods.Rect bounds, int notches, bool posted, IScrollStatus status, CancellationToken token)
+    {
+        status.Suspend();
         if ((NativeMethods.GetAsyncKeyState(NativeMethods.VkMenu) & 0x8000) != 0)
         {
             NativeMethods.keybd_event(NativeMethods.VkMenu, 0, NativeMethods.KeyEventKeyUp, UIntPtr.Zero);
             await Task.Delay(40, token);
         }
-        NativeMethods.SetForegroundWindow(hwnd);
+        FocusTarget(hwnd);
         int delta = -120 * Math.Clamp(notches, 1, 8);
         int x = bounds.Left + bounds.Width / 2;
         int y = bounds.Top + Math.Clamp((int)(bounds.Height * 0.55), 80, Math.Max(80, bounds.Height - 40));

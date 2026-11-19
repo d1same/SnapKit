@@ -82,6 +82,9 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hwnd, StringBuilder lpString, int nMax);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint source, uint target, bool attach);
+    [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hwnd, int cmd);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] public static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] public static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value);

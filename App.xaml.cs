@@ -68,7 +68,8 @@ public partial class App : System.Windows.Application
             }
         }
         if (_firstRun)
-            _state.Tray.Balloon(Brand.Name, "Installed. SnapKit starts with Windows and sits next to the clock. Ctrl+Alt+Shift+Esc quits if a window gets stuck.");
+            _state.Tray.Balloon(Brand.Name, "Installed. SnapKit " + ReleaseClient.Display + " starts with Windows and sits next to the clock. Ctrl+Alt+Shift+Esc quits if a window gets stuck.");
+        UpdateCheck.Queue();
     }
 
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)

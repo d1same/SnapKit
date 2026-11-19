@@ -28,26 +28,42 @@ internal static class Installer
         if (string.IsNullOrWhiteSpace(current))
             return;
 
-        Directory.CreateDirectory(DirectoryPath);
-        StopOtherCopies();
-        if (!TryReplace(current, ExePath))
+        bool updating = File.Exists(ExePath);
+        string? error = null;
+        InstallWindow.Run(updating, report =>
+        {
+            report(updating ? "Closing the copy that is already running…" : "Preparing the install folder…");
+            Directory.CreateDirectory(DirectoryPath);
+            StopOtherCopies();
+            report("Copying SnapKit…");
+            if (!TryReplace(current, ExePath))
+            {
+                error = "The installed " + Brand.Name + " file is still locked. End " + Brand.Name + " in Task Manager, then run this file again.";
+                return;
+            }
+
+            report("Adding the Start menu shortcut…");
+            try
+            {
+                CreateShortcut(ShortcutPath, ExePath);
+                RegisterUninstall(ExePath);
+            }
+            catch
+            {
+                // The copy is in place. Shortcuts can be repaired by running the file again.
+            }
+
+            report(updating ? "Starting the updated SnapKit…" : "Starting SnapKit…");
+        });
+
+        if (error != null)
         {
             System.Windows.MessageBox.Show(
-                "The installed " + Brand.Name + " file is still locked. End " + Brand.Name + " in Task Manager, then run this file again.",
+                error,
                 Brand.Name,
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);
             return;
-        }
-
-        try
-        {
-            CreateShortcut(ShortcutPath, ExePath);
-            RegisterUninstall(ExePath);
-        }
-        catch
-        {
-            // The copy is in place. Shortcuts can be repaired by running the file again.
         }
 
         Process.Start(new ProcessStartInfo(ExePath, "--first-run") { UseShellExecute = true });
