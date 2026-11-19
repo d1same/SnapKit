@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>SnapKit</RootNamespace>
+    <AssemblyName>SnapKit.Core</AssemblyName>
+  </PropertyGroup>
+
+  <!-- Brand.Name is generated from /brand.name so the exe name and the UI share one source. -->
+  <Target Name="GenerateBrand" BeforeTargets="BeforeCompile">
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <ItemGroup>
+      <_BrandLine Remove="@(_BrandLine)" />
+      <_BrandLine Include="// Generated from brand.name. Do not edit." />
+      <_BrandLine Include="namespace SnapKit%3B" />
+      <_BrandLine Include="public static class Brand" />
+      <_BrandLine Include="{" />
+      <_BrandLine Include="    public const string Name = &quot;$(BrandName)&quot;%3B" />
+      <_BrandLine Include="    public const string MutexName = &quot;Local%5C%5C&quot; + Name + &quot;.SingleInstance&quot;%3B" />
+      <_BrandLine Include="}" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)Brand.g.cs" Lines="@(_BrandLine)" Overwrite="true" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)Brand.g.cs" />
+      <FileWrites Include="$(IntermediateOutputPath)Brand.g.cs" />
+    </ItemGroup>
+  </Target>
+
+</Project>

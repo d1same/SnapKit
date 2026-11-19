@@ -1,0 +1,48 @@
+using System.Windows;
+using System.Windows.Interop;
+
+namespace SnapKit;
+
+internal static class WindowChrome
+{
+    public static void Place(Window window, int x, int y, int width, int height, double scale, bool topmost, bool activate)
+    {
+        width = Math.Max(1, width);
+        height = Math.Max(1, height);
+        scale = scale <= 0 ? 1 : scale;
+        window.Width = width / scale;
+        window.Height = height / scale;
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+            return;
+        StripFrame(hwnd);
+        uint flags = NativeMethods.SwpFrameChanged | NativeMethods.SwpShowWindow;
+        if (!activate)
+            flags |= NativeMethods.SwpNoActivate;
+        NativeMethods.SetWindowPos(hwnd, topmost ? NativeMethods.HwndTopmost : new IntPtr(0), x, y, width, height, flags);
+    }
+
+    public static void UseDarkTitle(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+            return;
+        int enabled = 1;
+        NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
+        NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaUseImmersiveDarkModeOld, ref enabled, sizeof(int));
+        int rounded = 2;
+        NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaWindowCornerPreference, ref rounded, sizeof(int));
+    }
+
+    public static void StripFrame(IntPtr hwnd)
+    {
+        long style = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlStyle).ToInt64();
+        style &= ~NativeMethods.WsCaption;
+        style &= ~NativeMethods.WsThickFrame;
+        NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlStyle, new IntPtr(style));
+        long ex = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle).ToInt64();
+        ex |= NativeMethods.WsExToolWindow;
+        ex &= ~NativeMethods.WsExAppWindow;
+        NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlExStyle, new IntPtr(ex));
+    }
+}

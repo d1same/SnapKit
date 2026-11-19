@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\snapkit.ico</ApplicationIcon>
+    <AssemblyName>$(BrandName)</AssemblyName>
+    <RootNamespace>SnapKit</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <DebugType>embedded</DebugType>
+    <!-- The manifest owns PerMonitorV2. WinForms would rather set ApplicationHighDpiMode, which does not apply to a WPF entry point. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <AllowedReferenceRelatedFileExtensions>.xml</AllowedReferenceRelatedFileExtensions>
+    <DefaultItemExcludes>$(DefaultItemExcludes);core/**;tests/**;tools/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WinForms is only the tray icon. Keep WPF names (Image, Button, Point) unambiguous. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="core/**" />
+    <Compile Remove="tests/**" />
+    <Compile Remove="tools/**" />
+    <None Remove="core/**" />
+    <None Remove="tests/**" />
+    <None Remove="tools/**" />
+    <EmbeddedResource Include="Assets\snapkit.ico" LogicalName="SnapKit.Assets.snapkit.ico" />
+    <ProjectReference Include="core\SnapKit.Core.csproj" />
+  </ItemGroup>
+
+</Project>

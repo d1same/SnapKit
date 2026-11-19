@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <BrandName>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)brand.name').Trim())</BrandName>
+    <Version>1.0.0</Version>
+    <Product>$(BrandName)</Product>
+    <Company>$(BrandName)</Company>
+    <AssemblyTitle>$(BrandName)</AssemblyTitle>
+    <Description>Fast, lightweight screenshot tool for people who write documentation.</Description>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+</Project>
