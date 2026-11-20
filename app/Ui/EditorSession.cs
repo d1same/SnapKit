@@ -92,7 +92,11 @@ internal sealed class EditorSession
     public void Copy()
     {
         var bitmap = Render();
-        ImageFile.Copy(bitmap);
+        if (!ImageFile.Copy(bitmap))
+        {
+            Flash("Clipboard is busy. Click Copy again.");
+            return;
+        }
         State.Recent.Update(Recent, BitmapConvert.ToPixelBuffer(bitmap));
         Flash("Copied. Paste it anywhere.");
         Delivered?.Invoke();

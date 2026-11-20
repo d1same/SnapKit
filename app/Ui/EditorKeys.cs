@@ -61,7 +61,6 @@ internal static class EditorKeys
         {
             Key.V => EditorTool.Select,
             Key.P => EditorTool.Pen,
-            Key.L => EditorTool.Line,
             Key.A => EditorTool.Arrow,
             Key.R => EditorTool.Rectangle,
             Key.E => EditorTool.Ellipse,

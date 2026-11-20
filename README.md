@@ -8,13 +8,13 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit.
 
-[SnapKit 0.1.7](https://github.com/d1same/SnapKit/releases/tag/v0.1.7)
+[SnapKit 0.1.8](https://github.com/d1same/SnapKit/releases/tag/v0.1.8)
 
 Download `SnapKit-win-x64.zip` from that release. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. A window stays on screen while it copies, so the install is not a silent pause. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip shows **Updating SnapKit**, closes whatever SnapKit is already running, and replaces it.
 
-This build is **0.1.7**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, an update window names both versions. **Update** downloads the zip, and the new copy shows the same install window while it replaces the old one. Settings also has **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
+This build is **0.1.8**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, an update window names both versions. **Update** downloads the zip, and the new copy shows the same install window while it replaces the old one. Settings also has **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -59,7 +59,6 @@ The toolbar sits next to the selection. Each tool has a name under its icon. The
 | --- | --- |
 | `V` | Select / move |
 | `P` | Pen |
-| `L` | Line |
 | `A` | Arrow |
 | `R` | Rectangle |
 | `E` | Ellipse |
@@ -87,7 +86,7 @@ Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` 
 
 OCR reads the capture on the PC, then highlights each word on the picture. The highlight sits on the word at 100%, 125%, 150%, and 200% scaling, including a monitor that is not at the top-left of the desktop. Drag across the words you want and that text is copied in reading order. `Ctrl+A` copies all of it. `Esc` closes the highlighter and leaves the capture editable. If OCR fails, the message stays in a small window with **Copy error**. OCR uses the Windows language already installed. No cloud.
 
-The color row and the hex box apply to the pen, line, arrow, rectangle, ellipse, highlighter, text, callout, step number, and spotlight. A selected mark changes with them. Stroke width changes the pen, line, arrow, shapes, highlighter, and blur. Text size changes text, callouts, and step numbers. Blur stays a pixelate; it has no tint.
+The color row and the hex box apply to the pen, arrow, rectangle, ellipse, highlighter, text, callout, step number, and spotlight. A selected mark changes with them. Stroke width changes the pen, arrow, shapes, highlighter, and blur. Text size changes text, callouts, and step numbers. Blur stays a pixelate; it has no tint.
 
 ### Global shortcuts
 

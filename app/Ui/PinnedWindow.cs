@@ -87,7 +87,7 @@ internal sealed class PinnedWindow : Window
         {
             if (e.ClickCount == 2)
             {
-                ImageFile.Copy(_image);
+                TryCopy();
                 return;
             }
             try { DragMove(); } catch { /* mouse already released */ }
@@ -97,17 +97,25 @@ internal sealed class PinnedWindow : Window
             if (e.Key == Key.Escape)
                 Close();
             else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
-                ImageFile.Copy(_image);
+                TryCopy();
             else if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
                 ImageFile.Save(_image, this);
         };
 
-        MouseRightButtonUp += (_, _) => ImageFile.Copy(_image);
+        MouseRightButtonUp += (_, _) => TryCopy();
         var menu = DarkMenu.Create();
-        menu.Items.Add(DarkMenu.Item("Copy", () => ImageFile.Copy(_image)));
+        menu.Items.Add(DarkMenu.Item("Copy", TryCopy));
         menu.Items.Add(DarkMenu.Item("Save as…", () => ImageFile.Save(_image, this)));
         menu.Items.Add(DarkMenu.Item("Close", Close));
         ContextMenu = menu;
         ToolTip = "Right-click copies the picture. Drag to move. Esc closes.";
+    }
+
+    private void TryCopy()
+    {
+        if (ImageFile.Copy(_image))
+            ToolTip = "Copied. Paste it anywhere.";
+        else
+            ToolTip = "Clipboard is busy. Try Copy again.";
     }
 }

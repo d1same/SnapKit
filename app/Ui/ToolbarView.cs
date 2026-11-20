@@ -37,7 +37,6 @@ internal sealed class ToolbarView : Border
         var tools = new WrapPanel();
         AddTool(tools, EditorTool.Select, "Select", "Select or move a mark  (V)", "M7,4 L7,20 L11,16 L14.5,22 L17.5,20.5 L14,14.5 L20,14.5 Z", filled: true);
         AddTool(tools, EditorTool.Pen, "Pen", "Draw freehand  (P)", "M4,20 L8.5,18.5 L19,8 L16,5 L5.5,15.5 Z M15.2,6.2 L17.8,8.8");
-        AddTool(tools, EditorTool.Line, "Line", "Straight line  (L)", "M5,19 L19,5");
         AddTool(tools, EditorTool.Arrow, "Arrow", "Arrow  (A)", "M5,19 L19,5 M19,5 L12,6.2 M19,5 L17.8,12");
         AddTool(tools, EditorTool.Rectangle, "Box", "Rectangle  (R)", "M5,5 H19 V19 H5 Z");
         AddTool(tools, EditorTool.Ellipse, "Circle", "Ellipse  (E)", "M12,5.5 A6.5,6.5 0 1 0 12.1,5.5");
