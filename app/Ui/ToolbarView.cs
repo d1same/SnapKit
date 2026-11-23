@@ -2,23 +2,36 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 
 namespace SnapKit;
 
-internal sealed class ToolbarView : Border
+/// <summary>
+/// Style 3 — Ultra-Minimal Rail UI:
+/// Top floating pill: slim single-row tool rail (icons + subtle shortcut letters, Undo/Redo/Clear,
+/// compact OCR/Pin/Save, optional live zoom controls, crisp white Copy CTA, and Close).
+/// Bottom detached floating pill: contextual options for the active tool/selection
+/// (color swatches + #HEX, stroke dots OR text size stepper OR shape fill toggle, Frame toggle,
+/// and live W×H pixel dimensions + green "Copied!" feedback).
+/// </summary>
+internal sealed class ToolbarView : StackPanel
 {
     private readonly Dictionary<EditorTool, Border> _tools = new();
     private readonly Dictionary<string, Border> _swatches = new();
     private readonly Dictionary<double, Border> _sizes = new();
     private readonly Dictionary<ShapeFillMode, Border> _fills = new();
-    private readonly Dictionary<double, Border> _fonts = new();
     private readonly Dictionary<BackdropPreset, Border> _backdrops = new();
 
-    private readonly Border _colorGroup;
-    private readonly Border _strokeGroup;
-    private readonly Border _fillGroup;
-    private readonly Border _fontGroup;
+    private readonly StackPanel _colorGroup;
+    private readonly FrameworkElement _colorSep;
+    private readonly StackPanel _strokeGroup;
+    private readonly FrameworkElement _strokeSep;
+    private readonly StackPanel _fillGroup;
+    private readonly FrameworkElement _fillSep;
+    private readonly StackPanel _fontGroup;
+    private readonly FrameworkElement _fontSep;
+    private readonly TextBlock _fontValue;
     private readonly Border _resetStep;
     private readonly TextBlock _resetStepLabel;
     private readonly TextBox _hex;
@@ -26,76 +39,145 @@ internal sealed class ToolbarView : Border
     private readonly Border _undo;
     private readonly Border _redo;
     private readonly Border _clear;
-    private readonly TextBlock _hint;
+    private readonly Border _copyButton;
+    private readonly TextBlock _copyLabel;
+    private readonly Shape _copyIcon;
+    private readonly TextBlock? _zoomText;
     private readonly TextBlock _dims;
+    private readonly Border _copiedPill;
+    private readonly TextBlock _copiedText;
+    private readonly TextBlock _statusText;
     private bool _sync;
 
     public ToolbarView(bool showFit)
     {
-        Background = Palette.Toolbar;
-        BorderBrush = Palette.Line;
-        BorderThickness = new Thickness(1);
-        CornerRadius = new CornerRadius(14);
-        Padding = new Thickness(10, 9, 10, 8);
+        Orientation = Orientation.Vertical;
+        Background = Brushes.Transparent;
+        HorizontalAlignment = HorizontalAlignment.Left;
         SnapsToDevicePixels = true;
-        Effect = new System.Windows.Media.Effects.DropShadowEffect
+
+        // ── Top Pill: Slim Single-Row Floating Tool Rail ────────────────────────────
+        var railRow = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+
+        AddTool(railRow, EditorTool.Select, "V", "Select, move, or drag handles  (V)", "M7,4 L7,20 L11,16 L14.5,22 L17.5,20.5 L14,14.5 L20,14.5 Z", filled: true);
+        railRow.Children.Add(Divider());
+
+        AddTool(railRow, EditorTool.Arrow, "A", "Arrow  (A) · Hold Shift for 45°", "M5,19 L19,5 M19,5 L12,6.2 M19,5 L17.8,12");
+        AddTool(railRow, EditorTool.Pen, "P", "Freehand pen  (P)", "M4,20 L8.5,18.5 L19,8 L16,5 L5.5,15.5 Z M15.2,6.2 L17.8,8.8");
+        AddTool(railRow, EditorTool.Rectangle, "R", "Rectangle  (R) · Shift = square", "M5,5 H19 V19 H5 Z");
+        AddTool(railRow, EditorTool.Ellipse, "E", "Ellipse  (E) · Shift = circle", "M12,5.5 A6.5,6.5 0 1 0 12.1,5.5");
+        AddTool(railRow, EditorTool.Highlighter, "H", "Highlighter  (H)", "M4,15 L14,5 L19,10 L9,20 Z M4,15 L7.5,18.5");
+        railRow.Children.Add(Divider());
+
+        AddTool(railRow, EditorTool.Text, "T", "Text  (T)", "M5,5 H19 M12,5 V19 M8,19 H16");
+        AddTool(railRow, EditorTool.Callout, "C", "Callout note  (C)", "M4,4 H20 V14 H12 L8,19 V14 H4 Z");
+        AddTool(railRow, EditorTool.Number, "N", "Step number  (N)", "M12,4.5 A7.5,7.5 0 1 0 12.1,4.5 M12,8 V16 M9.5,10.2 L12,8");
+        railRow.Children.Add(Divider());
+
+        AddTool(railRow, EditorTool.Blur, "B", "Pixelate blur  (B)", "M4,4 H10 V10 H4 Z M14,4 H20 V10 H14 Z M4,14 H10 V20 H4 Z M14,14 H20 V20 H14 Z");
+        AddTool(railRow, EditorTool.Redact, "D", "Redact blackout box  (D)", "M4,6 H20 V18 H4 Z", filled: true);
+        AddTool(railRow, EditorTool.Spotlight, "S", "Spotlight focus  (S)", "M12,3 V6 M12,18 V21 M3,12 H6 M18,12 H21 M6,6 L8,8 M16,16 L18,18 M18,6 L16,8 M8,16 L6,18 M12,8.5 A3.5,3.5 0 1 0 12.1,8.5");
+        railRow.Children.Add(Divider());
+
+        AddTool(railRow, EditorTool.Crop, "X", "Crop area  (X)", "M8,4 V8 H4 M16,4 V8 H20 M20,16 H16 V20 M4,16 H8 V20");
+        AddTool(railRow, EditorTool.Picker, "I", "Eyedropper — pick & copy #HEX  (I)", "M14,4 L20,10 L10,20 L6,21 L7,17 Z M8,15 L13,10");
+        railRow.Children.Add(Divider());
+
+        _undo = RailIconChip("M8,7 A6,6 0 1 0 14,12 M8,7 V11 M8,7 H12", "Undo  (Ctrl+Z)", () => UndoClicked?.Invoke());
+        _redo = RailIconChip("M16,7 A6,6 0 1 1 10,12 M16,7 V11 M16,7 H12", "Redo  (Ctrl+Y)", () => RedoClicked?.Invoke());
+        _clear = RailIconChip("M6,7 H18 M9,7 V5 H15 V7 M8,7 L9,19 H15 L16,7", "Clear all marks", () => ClearAllClicked?.Invoke());
+        railRow.Children.Add(_undo);
+        railRow.Children.Add(_redo);
+        railRow.Children.Add(_clear);
+        railRow.Children.Add(Divider());
+
+        railRow.Children.Add(RailCompactAction("M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M8,12 H16 M8,16 H14", "OCR", "Copy text from capture (OCR)", () => OcrClicked?.Invoke()));
+        railRow.Children.Add(RailCompactAction("M9,3 H15 L17,8 H19 L12,15 L5,8 H7 Z M12,15 V21", "Pin", "Pin floating on top", () => PinClicked?.Invoke()));
+        railRow.Children.Add(RailCompactAction("M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M8,13 H16 V21 H8 Z", "Save", "Save as… (Ctrl+S) · Quick Save (Ctrl+Shift+S)", () => SaveClicked?.Invoke()));
+
+        if (showFit)
         {
-            BlurRadius = 22,
-            ShadowDepth = 3,
-            Opacity = 0.5,
-            Color = Colors.Black
+            railRow.Children.Add(Divider());
+            railRow.Children.Add(RailTextChip("−", "Zoom out  (Ctrl+-)", () => ZoomOutClicked?.Invoke(), 24));
+            _zoomText = new TextBlock
+            {
+                Text = "100%",
+                Foreground = Palette.Text,
+                FontFamily = Palette.Mono,
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var zoomReadout = PillChip(_zoomText, "Fit to window  (Ctrl+0) · Ctrl+1 for 100%", () => FitClicked?.Invoke());
+            zoomReadout.MinWidth = 44;
+            railRow.Children.Add(zoomReadout);
+            railRow.Children.Add(RailTextChip("+", "Zoom in  (Ctrl++)", () => ZoomInClicked?.Invoke(), 24));
+        }
+
+        railRow.Children.Add(Divider());
+
+        // Crisp white Copy CTA on the right
+        _copyIcon = Icon("M8,8 H18 V20 H8 Z M6,6 H16 V8", filled: false, size: 14);
+        _copyIcon.Stroke = Palette.Ink;
+        _copyLabel = new TextBlock
+        {
+            Text = "Copy",
+            Foreground = Palette.Ink,
+            FontFamily = Palette.Font,
+            FontSize = 12.5,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(6, 0, 0, 0)
         };
+        _copyButton = new Border
+        {
+            Height = 28,
+            Padding = new Thickness(11, 0, 12, 0),
+            Margin = new Thickness(2, 1, 3, 1),
+            CornerRadius = new CornerRadius(7),
+            Background = Palette.ActiveSurface,
+            Cursor = Cursors.Hand,
+            ToolTip = "Copy to clipboard and close  (Ctrl+C)",
+            SnapsToDevicePixels = true,
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { _copyIcon, _copyLabel }
+            }
+        };
+        _copyButton.MouseEnter += (_, _) => _copyButton.Background = Palette.ActiveHover;
+        _copyButton.MouseLeave += (_, _) => _copyButton.Background = Palette.ActiveSurface;
+        _copyButton.MouseLeftButtonUp += (_, e) =>
+        {
+            CopyClicked?.Invoke();
+            e.Handled = true;
+        };
+        railRow.Children.Add(_copyButton);
 
-        // Row 1: Grouped tools
-        var toolsRow = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        var closeBtn = RailIconChip("M7,7 L17,17 M17,7 L7,17", "Discard & close  (Esc)", () => CloseClicked?.Invoke());
+        railRow.Children.Add(closeBtn);
 
-        var selectGroup = ToolGroup();
-        AddTool(selectGroup, EditorTool.Select, "Select", "Select, move, or resize marks  (V)", "M7,4 L7,20 L11,16 L14.5,22 L17.5,20.5 L14,14.5 L20,14.5 Z", filled: true);
-        toolsRow.Children.Add(selectGroup);
+        var topRail = FloatingPill(railRow, cornerRadius: 11, padding: new Thickness(5, 4, 5, 4));
+        Children.Add(topRail);
 
-        var drawGroup = ToolGroup();
-        AddTool(drawGroup, EditorTool.Arrow, "Arrow", "Arrow  (A) · Hold Shift for 45°", "M5,19 L19,5 M19,5 L12,6.2 M19,5 L17.8,12");
-        AddTool(drawGroup, EditorTool.Rectangle, "Box", "Rectangle  (R) · Hold Shift for square", "M5,5 H19 V19 H5 Z");
-        AddTool(drawGroup, EditorTool.Ellipse, "Circle", "Ellipse  (E) · Hold Shift for circle", "M12,5.5 A6.5,6.5 0 1 0 12.1,5.5");
-        AddTool(drawGroup, EditorTool.Pen, "Pen", "Freehand pen  (P)", "M4,20 L8.5,18.5 L19,8 L16,5 L5.5,15.5 Z M15.2,6.2 L17.8,8.8");
-        AddTool(drawGroup, EditorTool.Highlighter, "Mark", "Highlighter  (H)", "M4,15 L14,5 L19,10 L9,20 Z M4,15 L7.5,18.5");
-        toolsRow.Children.Add(drawGroup);
+        // ── Bottom Detached Pill: Contextual Options + Frame + Live W×H ────────────
+        var optRow = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
 
-        var annotateGroup = ToolGroup();
-        AddTool(annotateGroup, EditorTool.Text, "Text", "Text label  (T)", "M5,5 H19 M12,5 V19 M8,19 H16");
-        AddTool(annotateGroup, EditorTool.Callout, "Note", "Callout bubble  (C)", "M4,4 H20 V14 H12 L8,19 V14 H4 Z");
-        AddTool(annotateGroup, EditorTool.Number, "Step", "Numbered step badge  (N)", "M12,4.5 A7.5,7.5 0 1 0 12.1,4.5 M12,8 V16 M9.5,10.2 L12,8");
-        toolsRow.Children.Add(annotateGroup);
-
-        var privacyGroup = ToolGroup();
-        AddTool(privacyGroup, EditorTool.Blur, "Blur", "Pixelate box  (B)", "M4,4 H10 V10 H4 Z M14,4 H20 V10 H14 Z M4,14 H10 V20 H4 Z M14,14 H20 V20 H14 Z");
-        AddTool(privacyGroup, EditorTool.Redact, "Redact", "Solid opaque redaction block  (D)", "M4,6 H20 V18 H4 Z", filled: true);
-        AddTool(privacyGroup, EditorTool.Spotlight, "Spot", "Dim everything outside box  (S)", "M12,3 V6 M12,18 V21 M3,12 H6 M18,12 H21 M6,6 L8,8 M16,16 L18,18 M18,6 L16,8 M8,16 L6,18 M12,8.5 A3.5,3.5 0 1 0 12.1,8.5");
-        toolsRow.Children.Add(privacyGroup);
-
-        var utilityGroup = ToolGroup();
-        AddTool(utilityGroup, EditorTool.Crop, "Crop", "Crop capture area  (X)", "M8,4 V8 H4 M16,4 V8 H20 M20,16 H16 V20 M4,16 H8 V20");
-        AddTool(utilityGroup, EditorTool.Picker, "Color", "Pick pixel hex color  (I)", "M14,4 L20,10 L10,20 L6,21 L7,17 Z M8,15 L13,10");
-        toolsRow.Children.Add(utilityGroup);
-
-        // Row 2: Contextual style controls + docs backdrop + history
-        var styleRow = new WrapPanel { Margin = new Thickness(0, 7, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-
-        // Color swatches + hex input
-        var colorStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        // Color swatches + #HEX
+        _colorGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         foreach (var swatch in Palette.Swatches)
         {
             var dot = new Border
             {
-                Width = 17,
-                Height = 17,
-                CornerRadius = new CornerRadius(8.5),
+                Width = 14,
+                Height = 14,
+                CornerRadius = new CornerRadius(7),
                 Background = Palette.Brush(swatch),
-                BorderBrush = Palette.Line,
-                BorderThickness = new Thickness(1.5),
-                Margin = new Thickness(2.5, 0, 2.5, 0),
+                BorderBrush = Palette.LineStrong,
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(2, 0, 2, 0),
                 Cursor = Cursors.Hand,
-                ToolTip = $"Color {swatch}"
+                ToolTip = swatch
             };
             dot.MouseLeftButtonUp += (_, e) =>
             {
@@ -103,33 +185,33 @@ internal sealed class ToolbarView : Border
                 e.Handled = true;
             };
             _swatches[swatch] = dot;
-            colorStack.Children.Add(dot);
+            _colorGroup.Children.Add(dot);
         }
 
         _hexSwatch = new Border
         {
-            Width = 10,
-            Height = 10,
-            CornerRadius = new CornerRadius(5),
+            Width = 8,
+            Height = 8,
+            CornerRadius = new CornerRadius(4),
             Background = Palette.Brush("#FF3B30"),
-            Margin = new Thickness(0, 0, 5, 0),
+            Margin = new Thickness(0, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center
         };
         _hex = new TextBox
         {
             Text = "#FF3B30",
-            Width = 64,
-            Height = 22,
+            Width = 58,
+            Height = 20,
             Background = Brushes.Transparent,
             Foreground = Palette.Text,
             BorderThickness = new Thickness(0),
             FontFamily = Palette.Mono,
-            FontSize = 11.5,
-            CaretBrush = Brushes.White,
+            FontSize = 11,
+            CaretBrush = Palette.Text,
             VerticalAlignment = VerticalAlignment.Center,
             VerticalContentAlignment = VerticalAlignment.Center,
             MaxLength = 7,
-            ToolTip = "Hex color — press Enter to apply to the selected mark and next marks"
+            ToolTip = "Hex color — press Enter to apply"
         };
         _hex.KeyDown += (_, e) =>
         {
@@ -140,190 +222,164 @@ internal sealed class ToolbarView : Border
             e.Handled = true;
         };
         _hex.LostKeyboardFocus += (_, _) => CommitHex();
-        var hexPill = new Border
+        _colorGroup.Children.Add(new Border
         {
             Background = Palette.Field,
             BorderBrush = Palette.Line,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(6, 1, 5, 1),
-            Margin = new Thickness(6, 0, 2, 0),
-            Child = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Children = { _hexSwatch, _hex }
-            }
-        };
-        colorStack.Children.Add(hexPill);
-        _colorGroup = StyleGroup(colorStack);
-        styleRow.Children.Add(_colorGroup);
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(5, 0, 4, 0),
+            Margin = new Thickness(5, 0, 1, 0),
+            Child = new StackPanel { Orientation = Orientation.Horizontal, Children = { _hexSwatch, _hex } }
+        });
+        _colorSep = SmallDivider();
+        optRow.Children.Add(_colorGroup);
+        optRow.Children.Add(_colorSep);
 
-        // Stroke size pills (contextual)
-        var strokeStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        // Stroke dots
+        _strokeGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         foreach (var size in new[] { 2d, 3d, 5d, 8d, 12d })
         {
             var dot = new Ellipse
             {
-                Width = Math.Clamp(size + 2, 4.5, 14),
-                Height = Math.Clamp(size + 2, 4.5, 14),
+                Width = Math.Clamp(size + 1.5, 4, 12),
+                Height = Math.Clamp(size + 1.5, 4, 12),
                 Fill = Palette.Text,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            var chip = CompactChip(dot, $"{size:0} px width  ([ / ])", () => StrokePicked?.Invoke(size), 24, 24);
+            var chip = FixedChip(dot, $"{size:0} px  ([ / ])", () => StrokePicked?.Invoke(size), 22, 22);
             _sizes[size] = chip;
-            strokeStack.Children.Add(chip);
+            _strokeGroup.Children.Add(chip);
         }
-        _strokeGroup = StyleGroup(strokeStack);
-        styleRow.Children.Add(_strokeGroup);
+        _strokeSep = SmallDivider();
+        optRow.Children.Add(_strokeGroup);
+        optRow.Children.Add(_strokeSep);
 
-        // Fill mode selector (contextual for Box / Circle)
-        var fillStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        AddFillChip(fillStack, ShapeFillMode.Outline, "Outline", "Stroke outline only");
-        AddFillChip(fillStack, ShapeFillMode.Tint, "Tint", "Outline with translucent tint fill");
-        AddFillChip(fillStack, ShapeFillMode.Solid, "Solid", "Solid filled shape");
-        _fillGroup = StyleGroup(fillStack);
-        styleRow.Children.Add(_fillGroup);
+        // Shape fill toggle (Outline / Tint / Solid)
+        _fillGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        AddFillChip(_fillGroup, ShapeFillMode.Outline, "Outline", "Stroke outline only");
+        AddFillChip(_fillGroup, ShapeFillMode.Tint, "Tint", "Outline with subtle translucent fill");
+        AddFillChip(_fillGroup, ShapeFillMode.Solid, "Solid", "Solid filled shape");
+        _fillSep = SmallDivider();
+        optRow.Children.Add(_fillGroup);
+        optRow.Children.Add(_fillSep);
 
-        // Font size selector (contextual for Text / Callout / Step)
-        var fontStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        foreach (var pt in new[] { 14d, 18d, 24d, 32d })
+        // Text size stepper (− 18 +)
+        _fontGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        _fontValue = new TextBlock
         {
-            var text = new TextBlock
-            {
-                Text = pt.ToString("0"),
-                Foreground = Palette.Text,
-                FontFamily = Palette.Font,
-                FontSize = 11.5,
-                FontWeight = FontWeights.SemiBold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            var chip = CompactChip(text, $"Text size {pt:0} pt", () => FontPicked?.Invoke(pt), 28, 24);
-            _fonts[pt] = chip;
-            fontStack.Children.Add(chip);
-        }
-        _fontGroup = StyleGroup(fontStack);
-        styleRow.Children.Add(_fontGroup);
-
-        // Reset step #1 pill (contextual for Step tool or when NextNumber > 1)
-        _resetStepLabel = new TextBlock
-        {
-            Text = "Reset #1",
-            Foreground = Palette.Text,
-            FontFamily = Palette.Font,
-            FontSize = 11,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        _resetStep = StyleChip(_resetStepLabel, "Reset next step counter back to #1", () => ResetStepClicked?.Invoke());
-        _resetStep.Margin = new Thickness(0, 2, 6, 2);
-        styleRow.Children.Add(_resetStep);
-
-        // Docs Backdrop Frame selector
-        var backdropStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        backdropStack.Children.Add(new TextBlock
-        {
-            Text = "Frame",
-            Foreground = Palette.Subtle,
-            FontFamily = Palette.Font,
-            FontSize = 10.5,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 0, 4, 0)
-        });
-        AddBackdropChip(backdropStack, BackdropPreset.None, "Off", null, "No backdrop frame");
-        AddBackdropChip(backdropStack, BackdropPreset.Clean, "Clean", "#EDF2F7", "Clean light docs frame with soft shadow");
-        AddBackdropChip(backdropStack, BackdropPreset.Dark, "Dark", "#1C1E26", "Dark docs frame with soft shadow");
-        AddBackdropChip(backdropStack, BackdropPreset.Slate, "Slate", "#3B4C63", "Slate blue docs frame with soft shadow");
-        styleRow.Children.Add(StyleGroup(backdropStack));
-
-        // History & Clear group
-        var historyStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        _undo = CompactIconChip("M8,7 A6,6 0 1 0 14,12 M8,7 V11 M8,7 H12", "Undo", "Undo  (Ctrl+Z)", () => UndoClicked?.Invoke());
-        _redo = CompactIconChip("M16,7 A6,6 0 1 1 10,12 M16,7 V11 M16,7 H12", "Redo", "Redo  (Ctrl+Y)", () => RedoClicked?.Invoke());
-        _clear = CompactIconChip("M6,7 H18 M9,7 V5 H15 V7 M8,7 L9,19 H15 L16,7", "Clear", "Clear all marks (Ctrl+Z restores them)", () => ClearAllClicked?.Invoke());
-        historyStack.Children.Add(_undo);
-        historyStack.Children.Add(_redo);
-        historyStack.Children.Add(_clear);
-        styleRow.Children.Add(StyleGroup(historyStack));
-
-        // Row 3: Primary actions (Electric-Blue Copy + Save / Quick / OCR / Pin / Fit / Close)
-        var actionsRow = new WrapPanel { Margin = new Thickness(0, 8, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        actionsRow.Children.Add(CopyButton());
-        actionsRow.Children.Add(ActionChip("M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M8,13 H16 V21 H8 Z", "Save", "Save as PNG or JPG  (Ctrl+S)", () => SaveClicked?.Invoke()));
-        actionsRow.Children.Add(ActionChip("M13,3 L5,13 H12 L11,21 L19,11 H12 Z", "Quick", "Quick save PNG to SnapKit folder  (Ctrl+Shift+S)", () => QuickSaveClicked?.Invoke()));
-        actionsRow.Children.Add(ActionChip("M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M8,12 H16 M8,16 H14", "OCR", "Read & copy text from this capture", () => OcrClicked?.Invoke()));
-        actionsRow.Children.Add(ActionChip("M9,3 H15 L17,8 H19 L12,15 L5,8 H7 Z M12,15 V21", "Pin", "Pin capture floating always-on-top", () => PinClicked?.Invoke()));
-        if (showFit)
-            actionsRow.Children.Add(ActionChip("M4,9 V4 H9 M15,4 H20 V9 M20,15 V20 H15 M9,20 H4 V15", "Fit", "Fit to window  (Ctrl+0) · Zoom Ctrl++ / Ctrl+-", () => FitClicked?.Invoke()));
-        actionsRow.Children.Add(ActionChip("M7,7 L17,17 M17,7 L7,17", "Close", "Discard edits and close  (Esc)", () => CloseClicked?.Invoke()));
-
-        // Row 4: Live dimensions footer
-        _hint = new TextBlock
-        {
-            Text = "Copy copies and closes · Esc closes",
-            Foreground = Palette.Muted,
-            FontFamily = Palette.Font,
-            FontSize = 11,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        _dims = new TextBlock
-        {
-            Text = "0 × 0 px",
+            Text = "18",
             Foreground = Palette.Text,
             FontFamily = Palette.Mono,
             FontSize = 11,
             FontWeight = FontWeights.SemiBold,
+            MinWidth = 22,
+            TextAlignment = TextAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        var dimsPill = new Border
+        _fontGroup.Children.Add(FixedChip(MiniLabel("−"), "Smaller text", () => FontStepped?.Invoke(-2), 20, 22));
+        _fontGroup.Children.Add(_fontValue);
+        _fontGroup.Children.Add(FixedChip(MiniLabel("+"), "Larger text", () => FontStepped?.Invoke(2), 20, 22));
+
+        _resetStepLabel = new TextBlock
         {
-            Background = Palette.Group,
-            BorderBrush = Palette.Divider,
+            Text = "Reset #1",
+            Foreground = Palette.Muted,
+            FontFamily = Palette.Font,
+            FontSize = 10.5,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _resetStep = PillChip(_resetStepLabel, "Reset next step counter back to #1", () => ResetStepClicked?.Invoke());
+        _resetStep.Margin = new Thickness(4, 0, 0, 0);
+        _fontGroup.Children.Add(_resetStep);
+
+        _fontSep = SmallDivider();
+        optRow.Children.Add(_fontGroup);
+        optRow.Children.Add(_fontSep);
+
+        // Docs Backdrop Frame toggle
+        var frameGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        frameGroup.Children.Add(new TextBlock
+        {
+            Text = "Frame",
+            Foreground = Palette.Muted,
+            FontFamily = Palette.Font,
+            FontSize = 10.5,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(1, 0, 4, 0)
+        });
+        AddBackdropChip(frameGroup, BackdropPreset.None, "Off", "No backdrop frame");
+        AddBackdropChip(frameGroup, BackdropPreset.Clean, "Clean", "Clean light docs frame with soft shadow");
+        AddBackdropChip(frameGroup, BackdropPreset.Dark, "Dark", "Dark graphite docs frame");
+        AddBackdropChip(frameGroup, BackdropPreset.Slate, "Slate", "Slate docs frame");
+        optRow.Children.Add(frameGroup);
+        optRow.Children.Add(SmallDivider());
+
+        // Live W×H dimensions + optional status / green "Copied!" badge
+        _dims = new TextBlock
+        {
+            Text = "0 × 0",
+            Foreground = Palette.Muted,
+            FontFamily = Palette.Mono,
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(2, 0, 2, 0),
+            ToolTip = "Live capture dimensions (pixels)"
+        };
+        optRow.Children.Add(_dims);
+
+        _statusText = new TextBlock
+        {
+            Text = "",
+            Foreground = Palette.Muted,
+            FontFamily = Palette.Font,
+            FontSize = 10.5,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(6, 0, 2, 0),
+            Visibility = Visibility.Collapsed
+        };
+        optRow.Children.Add(_statusText);
+
+        _copiedText = new TextBlock
+        {
+            Text = "Copied!",
+            Foreground = Palette.Copied,
+            FontFamily = Palette.Font,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _copiedPill = new Border
+        {
+            Background = Palette.CopiedSoft,
+            BorderBrush = Palette.Copied,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(5),
-            Padding = new Thickness(7, 2, 7, 2),
-            Margin = new Thickness(10, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = _dims
+            Padding = new Thickness(6, 1, 6, 1),
+            Margin = new Thickness(6, 0, 0, 0),
+            Visibility = Visibility.Collapsed,
+            Child = _copiedText
         };
+        optRow.Children.Add(_copiedPill);
 
-        var footerGrid = new Grid();
-        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(_hint, 0);
-        Grid.SetColumn(dimsPill, 1);
-        footerGrid.Children.Add(_hint);
-        footerGrid.Children.Add(dimsPill);
-
-        var footer = new Border
-        {
-            BorderBrush = Palette.Divider,
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            Margin = new Thickness(0, 8, 0, 0),
-            Padding = new Thickness(2, 6, 0, 0),
-            Child = footerGrid
-        };
-
-        Child = new StackPanel
-        {
-            Children = { toolsRow, styleRow, actionsRow, footer }
-        };
+        var optionsPill = FloatingPill(optRow, cornerRadius: 9, padding: new Thickness(8, 4, 8, 4));
+        optionsPill.Margin = new Thickness(0, 6, 0, 0);
+        optionsPill.HorizontalAlignment = HorizontalAlignment.Left;
+        Children.Add(optionsPill);
 
         HighlightTool(EditorTool.Arrow);
         HighlightSwatch("#FF3B30");
         HighlightSize(3);
         HighlightFill(ShapeFillMode.Outline);
-        HighlightFont(18);
         HighlightBackdrop(BackdropPreset.None);
     }
 
     public event Action<EditorTool>? ToolPicked;
     public event Action<string>? ColorPicked;
     public event Action<double>? StrokePicked;
-    public event Action<double>? FontPicked;
+    public event Action<double>? FontStepped;
     public event Action<ShapeFillMode>? FillModePicked;
     public event Action<BackdropPreset>? BackdropPicked;
     public event Action? UndoClicked;
@@ -332,36 +388,38 @@ internal sealed class ToolbarView : Border
     public event Action? ResetStepClicked;
     public event Action? CopyClicked;
     public event Action? SaveClicked;
-    public event Action? QuickSaveClicked;
     public event Action? PinClicked;
     public event Action? OcrClicked;
     public event Action? CloseClicked;
     public event Action? FitClicked;
+    public event Action? ZoomInClicked;
+    public event Action? ZoomOutClicked;
 
     public void Sync(EditorSession session)
     {
         _sync = true;
+        string activeColor = session.ActiveColorHex;
         if (!_hex.IsKeyboardFocusWithin)
-            _hex.Text = session.ColorHex;
-        _hexSwatch.Background = Palette.Brush(session.ColorHex);
-        _hint.Text = session.Status;
+            _hex.Text = activeColor;
+        _hexSwatch.Background = Palette.Brush(activeColor);
+        _fontValue.Text = session.FontSize.ToString("0");
 
         HighlightTool(session.Tool);
-        HighlightSwatch(session.ColorHex);
+        HighlightSwatch(activeColor);
         HighlightSize(session.Stroke);
         HighlightFill(session.FillMode);
-        HighlightFont(session.FontSize);
         HighlightBackdrop(session.Document.Backdrop);
         UpdateContextualControls(session);
-        UpdateDimensions(session);
+        UpdateDimensionsAndFeedback(session);
 
-        _undo.Opacity = session.Document.CanUndo ? 1 : 0.35;
-        _redo.Opacity = session.Document.CanRedo ? 1 : 0.35;
-        _clear.Opacity = session.Document.Annotations.Count > 0 ? 1 : 0.35;
-        _resetStepLabel.Text = session.Document.NextNumber > 1
-            ? $"Reset #1 (#{session.Document.NextNumber})"
-            : "Step #1";
-        _resetStep.Opacity = session.Document.NextNumber > 1 ? 1 : 0.55;
+        if (_zoomText != null && session.ZoomPercent is { } pct)
+            _zoomText.Text = $"{Math.Round(pct)}%";
+
+        _undo.Opacity = session.Document.CanUndo ? 1 : 0.32;
+        _redo.Opacity = session.Document.CanRedo ? 1 : 0.32;
+        _clear.Opacity = session.Document.Annotations.Count > 0 ? 1 : 0.32;
+        _resetStepLabel.Text = session.Document.NextNumber > 1 ? $"Reset #1 (#{session.Document.NextNumber})" : "Step #1";
+        _resetStep.Opacity = session.Document.NextNumber > 1 ? 1 : 0.5;
         _sync = false;
     }
 
@@ -381,36 +439,56 @@ internal sealed class ToolbarView : Border
         bool showResetStep = tool == EditorTool.Number || session.Document.NextNumber > 1;
 
         _colorGroup.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
+        _colorSep.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
+
         _strokeGroup.Visibility = showStroke ? Visibility.Visible : Visibility.Collapsed;
+        _strokeSep.Visibility = showStroke ? Visibility.Visible : Visibility.Collapsed;
+
         _fillGroup.Visibility = showFill ? Visibility.Visible : Visibility.Collapsed;
-        _fontGroup.Visibility = showFont ? Visibility.Visible : Visibility.Collapsed;
+        _fillSep.Visibility = showFill ? Visibility.Visible : Visibility.Collapsed;
+
+        bool showFontArea = showFont || showResetStep;
+        _fontGroup.Visibility = showFontArea ? Visibility.Visible : Visibility.Collapsed;
+        _fontSep.Visibility = showFontArea ? Visibility.Visible : Visibility.Collapsed;
+        // Hide stepper controls inside _fontGroup if only Reset #1 is visible
+        for (int i = 0; i < 3 && i < _fontGroup.Children.Count; i++)
+            _fontGroup.Children[i].Visibility = showFont ? Visibility.Visible : Visibility.Collapsed;
         _resetStep.Visibility = showResetStep ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void UpdateDimensions(EditorSession session)
+    private void UpdateDimensionsAndFeedback(EditorSession session)
     {
         int w = session.Document.View.Width;
         int h = session.Document.View.Height;
-        var backdrop = session.Document.Backdrop;
-        string dimText;
-        if (backdrop == BackdropPreset.None)
+        if (session.Document.Backdrop == BackdropPreset.None)
         {
-            dimText = $"{w} × {h} px";
+            _dims.Text = $"{w}×{h}";
         }
         else
         {
-            var metrics = BackdropLayout.Measure(backdrop, w, h);
-            dimText = $"{w}×{h} → {metrics.TotalWidth}×{metrics.TotalHeight} · {backdrop}";
+            var m = BackdropLayout.Measure(session.Document.Backdrop, w, h);
+            _dims.Text = $"{w}×{h} → {m.TotalWidth}×{m.TotalHeight}";
         }
 
-        if (session.ZoomPercent is { } zoom)
-            dimText += $"  ·  {Math.Round(zoom)}%";
-
-        int marks = session.Document.Annotations.Count;
-        if (marks > 0)
-            dimText += marks == 1 ? "  ·  1 mark" : $"  ·  {marks} marks";
-
-        _dims.Text = dimText;
+        if (session.IsCopiedFeedback && !string.IsNullOrWhiteSpace(session.Status))
+        {
+            _copiedText.Text = session.Status;
+            _copiedPill.Visibility = Visibility.Visible;
+            _statusText.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            _copiedPill.Visibility = Visibility.Collapsed;
+            if (!string.IsNullOrWhiteSpace(session.Status) && session.Status.Length <= 42)
+            {
+                _statusText.Text = "· " + session.Status;
+                _statusText.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _statusText.Visibility = Visibility.Collapsed;
+            }
+        }
     }
 
     private void CommitHex()
@@ -420,59 +498,110 @@ internal sealed class ToolbarView : Border
         ColorPicked?.Invoke(_hex.Text);
     }
 
-    private static Border ToolGroup()
+    private static Border FloatingPill(UIElement child, double cornerRadius, Thickness padding) => new()
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        return new Border
-        {
-            Background = Palette.Group,
-            BorderBrush = Palette.Divider,
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(2),
-            Margin = new Thickness(0, 2, 6, 2),
-            SnapsToDevicePixels = true,
-            Child = panel
-        };
-    }
-
-    private static Border StyleGroup(UIElement content) => new()
-    {
-        Background = Palette.Group,
-        BorderBrush = Palette.Divider,
+        Background = Palette.Toolbar,
+        BorderBrush = Palette.Line,
         BorderThickness = new Thickness(1),
-        CornerRadius = new CornerRadius(9),
-        Padding = new Thickness(4, 2, 4, 2),
-        Margin = new Thickness(0, 2, 6, 2),
-        MinHeight = 30,
+        CornerRadius = new CornerRadius(cornerRadius),
+        Padding = padding,
         SnapsToDevicePixels = true,
-        Child = content
+        Effect = new DropShadowEffect
+        {
+            BlurRadius = 18,
+            ShadowDepth = 3,
+            Opacity = 0.48,
+            Color = Colors.Black
+        },
+        Child = child
     };
 
-    private void AddTool(Border group, EditorTool tool, string name, string tip, string geometry, bool filled = false)
+    private static Border Divider() => new()
     {
-        var chip = ToolChip(Icon(geometry, filled, 16), name, tip, () =>
+        Width = 1,
+        Height = 18,
+        Background = Palette.Divider,
+        Margin = new Thickness(4, 0, 4, 0),
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private static Border SmallDivider() => new()
+    {
+        Width = 1,
+        Height = 14,
+        Background = Palette.Divider,
+        Margin = new Thickness(6, 0, 6, 0),
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private void AddTool(Panel panel, EditorTool tool, string key, string tip, string geometry, bool filled = false)
+    {
+        var icon = Icon(geometry, filled, 14.5);
+        icon.Margin = new Thickness(0, 0, 2, 2);
+        var badge = new TextBlock
         {
-            if (_sync)
-                return;
-            ToolPicked?.Invoke(tool);
-        });
+            Text = key,
+            Foreground = Palette.Subtle,
+            FontFamily = Palette.Font,
+            FontSize = 7.5,
+            FontWeight = FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 2.5, 1),
+            IsHitTestVisible = false
+        };
+        var host = new Grid { Children = { icon, badge } };
+        var chip = FixedChip(host, tip, () =>
+        {
+            if (!_sync)
+                ToolPicked?.Invoke(tool);
+        }, 30, 28);
+        chip.CornerRadius = new CornerRadius(7);
         _tools[tool] = chip;
-        ((StackPanel)group.Child).Children.Add(chip);
+        panel.Children.Add(chip);
     }
 
-    private void AddFillChip(Panel panel, ShapeFillMode mode, string label, string tip)
+    private Border RailIconChip(string geometry, string tip, Action click)
     {
+        var chip = FixedChip(Icon(geometry, false, 14), tip, click, 28, 28);
+        chip.CornerRadius = new CornerRadius(7);
+        return chip;
+    }
+
+    private Border RailCompactAction(string geometry, string label, string tip, Action click)
+    {
+        var icon = Icon(geometry, false, 13);
         var text = new TextBlock
         {
             Text = label,
             Foreground = Palette.Text,
             FontFamily = Palette.Font,
-            FontSize = 11,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
+            FontSize = 11.5,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 0, 0)
         };
-        var chip = StyleChip(text, tip, () =>
+        var chip = PillChip(new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children = { icon, text }
+        }, tip, click);
+        chip.Height = 28;
+        chip.CornerRadius = new CornerRadius(7);
+        chip.Padding = new Thickness(7, 0, 8, 0);
+        return chip;
+    }
+
+    private static Border RailTextChip(string text, string tip, Action click, double width)
+    {
+        var chip = FixedChip(MiniLabel(text, 13), tip, click, width, 28);
+        chip.CornerRadius = new CornerRadius(7);
+        return chip;
+    }
+
+    private void AddFillChip(Panel panel, ShapeFillMode mode, string label, string tip)
+    {
+        var chip = PillChip(MiniLabel(label, 10.5), tip, () =>
         {
             if (!_sync)
                 FillModePicked?.Invoke(mode);
@@ -481,33 +610,9 @@ internal sealed class ToolbarView : Border
         panel.Children.Add(chip);
     }
 
-    private void AddBackdropChip(Panel panel, BackdropPreset preset, string label, string? swatchHex, string tip)
+    private void AddBackdropChip(Panel panel, BackdropPreset preset, string label, string tip)
     {
-        var content = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        if (swatchHex != null)
-        {
-            content.Children.Add(new Border
-            {
-                Width = 9,
-                Height = 9,
-                CornerRadius = new CornerRadius(2.5),
-                Background = Palette.Brush(swatchHex),
-                BorderBrush = Palette.Line,
-                BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 0, 4, 0),
-                VerticalAlignment = VerticalAlignment.Center
-            });
-        }
-        content.Children.Add(new TextBlock
-        {
-            Text = label,
-            Foreground = Palette.Text,
-            FontFamily = Palette.Font,
-            FontSize = 11,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
-        });
-        var chip = StyleChip(content, tip, () =>
+        var chip = PillChip(MiniLabel(label, 10.5), tip, () =>
         {
             if (!_sync)
                 BackdropPicked?.Invoke(preset);
@@ -516,184 +621,13 @@ internal sealed class ToolbarView : Border
         panel.Children.Add(chip);
     }
 
-    private Border CopyButton()
-    {
-        var icon = Icon("M8,8 H18 V20 H8 Z M6,6 H16 V8", filled: false, size: 17);
-        icon.Stroke = Brushes.White;
-        var label = new TextBlock
-        {
-            Text = "Copy",
-            Foreground = Brushes.White,
-            FontFamily = Palette.Font,
-            FontSize = 14.5,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(7, 0, 8, 0)
-        };
-        var kbd = new Border
-        {
-            Background = Palette.Freeze(255, 255, 255, 0x26),
-            CornerRadius = new CornerRadius(4),
-            Padding = new Thickness(5, 1, 5, 1),
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock
-            {
-                Text = "Ctrl+C",
-                Foreground = Palette.Freeze(255, 255, 255, 0xE8),
-                FontFamily = Palette.Mono,
-                FontSize = 10,
-                VerticalAlignment = VerticalAlignment.Center
-            }
-        };
-        var row = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Children = { icon, label, kbd }
-        };
-        var button = new Border
-        {
-            MinWidth = 144,
-            Height = 38,
-            Margin = new Thickness(0, 2, 8, 2),
-            Padding = new Thickness(14, 0, 12, 0),
-            CornerRadius = new CornerRadius(10),
-            Background = Palette.Accent,
-            Child = row,
-            ToolTip = "Copy capture to clipboard and close  (Ctrl+C)",
-            Cursor = Cursors.Hand,
-            SnapsToDevicePixels = true
-        };
-        button.MouseEnter += (_, _) => button.Background = Palette.AccentHover;
-        button.MouseLeave += (_, _) => button.Background = Palette.Accent;
-        button.MouseLeftButtonUp += (_, e) =>
-        {
-            CopyClicked?.Invoke();
-            e.Handled = true;
-        };
-        return button;
-    }
-
-    private Border ActionChip(string geometry, string name, string tip, Action click)
-    {
-        var icon = Icon(geometry, filled: false, size: 15);
-        var caption = new TextBlock
-        {
-            Text = name,
-            Foreground = Palette.Text,
-            FontFamily = Palette.Font,
-            FontSize = 12,
-            FontWeight = FontWeights.Medium,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(6, 0, 0, 0)
-        };
-        var row = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Children = { icon, caption }
-        };
-        var chip = new Border
-        {
-            Height = 38,
-            Margin = new Thickness(0, 2, 5, 2),
-            Padding = new Thickness(10, 0, 11, 0),
-            CornerRadius = new CornerRadius(9),
-            Background = Palette.Elevated,
-            BorderBrush = Palette.Line,
-            BorderThickness = new Thickness(1),
-            Child = row,
-            ToolTip = tip,
-            Cursor = Cursors.Hand,
-            SnapsToDevicePixels = true
-        };
-        chip.MouseEnter += (_, _) => chip.Background = Palette.Hover;
-        chip.MouseLeave += (_, _) => chip.Background = Palette.Elevated;
-        chip.MouseLeftButtonUp += (_, e) =>
-        {
-            click();
-            e.Handled = true;
-        };
-        return chip;
-    }
-
-    private Border ToolChip(UIElement icon, string name, string tip, Action click)
-    {
-        var caption = new TextBlock
-        {
-            Text = name,
-            Foreground = Palette.Muted,
-            FontFamily = Palette.Font,
-            FontSize = 10,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 2, 0, 0)
-        };
-        var stack = new StackPanel
-        {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Children = { icon, caption }
-        };
-        var chip = new Border
-        {
-            Width = 46,
-            Height = 40,
-            Margin = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
-            Background = Brushes.Transparent,
-            Child = stack,
-            ToolTip = tip,
-            Cursor = Cursors.Hand,
-            SnapsToDevicePixels = true
-        };
-        chip.MouseEnter += (_, _) =>
-        {
-            if (chip.Background == Brushes.Transparent)
-                chip.Background = Palette.Hover;
-        };
-        chip.MouseLeave += (_, _) =>
-        {
-            if (chip.Background == Palette.Hover)
-                chip.Background = Brushes.Transparent;
-        };
-        chip.MouseLeftButtonUp += (_, e) =>
-        {
-            click();
-            e.Handled = true;
-        };
-        return chip;
-    }
-
-    private Border CompactIconChip(string geometry, string label, string tip, Action click)
-    {
-        var icon = Icon(geometry, filled: false, size: 13);
-        var text = new TextBlock
-        {
-            Text = label,
-            Foreground = Palette.Text,
-            FontFamily = Palette.Font,
-            FontSize = 11,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 0, 0, 0)
-        };
-        var row = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-            Children = { icon, text }
-        };
-        return StyleChip(row, tip, click);
-    }
-
-    private static Border CompactChip(UIElement content, string tip, Action click, double width, double height)
+    private static Border FixedChip(UIElement content, string tip, Action click, double width, double height)
     {
         var chip = new Border
         {
             Width = width,
             Height = height,
-            Margin = new Thickness(1),
+            Margin = new Thickness(1, 0, 1, 0),
             CornerRadius = new CornerRadius(6),
             Background = Brushes.Transparent,
             Child = content,
@@ -701,38 +635,30 @@ internal sealed class ToolbarView : Border
             Cursor = Cursors.Hand,
             SnapsToDevicePixels = true
         };
-        chip.MouseEnter += (_, _) =>
-        {
-            if (chip.Background == Brushes.Transparent)
-                chip.Background = Palette.Hover;
-        };
-        chip.MouseLeave += (_, _) =>
-        {
-            if (chip.Background == Palette.Hover)
-                chip.Background = Brushes.Transparent;
-        };
-        chip.MouseLeftButtonUp += (_, e) =>
-        {
-            click();
-            e.Handled = true;
-        };
+        AttachChipBehavior(chip, click);
         return chip;
     }
 
-    private static Border StyleChip(UIElement content, string tip, Action click)
+    private static Border PillChip(UIElement content, string tip, Action click)
     {
         var chip = new Border
         {
-            Height = 24,
-            Margin = new Thickness(1),
-            Padding = new Thickness(7, 0, 7, 0),
-            CornerRadius = new CornerRadius(6),
+            Height = 22,
+            Margin = new Thickness(1, 0, 1, 0),
+            Padding = new Thickness(6, 0, 6, 0),
+            CornerRadius = new CornerRadius(5.5),
             Background = Brushes.Transparent,
             Child = content,
             ToolTip = tip,
             Cursor = Cursors.Hand,
             SnapsToDevicePixels = true
         };
+        AttachChipBehavior(chip, click);
+        return chip;
+    }
+
+    private static void AttachChipBehavior(Border chip, Action click)
+    {
         chip.MouseEnter += (_, _) =>
         {
             if (chip.Background == Brushes.Transparent)
@@ -748,7 +674,6 @@ internal sealed class ToolbarView : Border
             click();
             e.Handled = true;
         };
-        return chip;
     }
 
     private void HighlightTool(EditorTool tool)
@@ -756,8 +681,8 @@ internal sealed class ToolbarView : Border
         foreach (var (key, chip) in _tools)
         {
             bool active = key == tool;
-            chip.Background = active ? Palette.Accent : Brushes.Transparent;
-            PaintInk(chip, active ? Brushes.White : Palette.Text, active ? Brushes.White : Palette.Muted);
+            chip.Background = active ? Palette.ActiveSurface : Brushes.Transparent;
+            PaintInk(chip, active ? Palette.Ink : Palette.Text, active ? Palette.Ink : Palette.Subtle);
         }
     }
 
@@ -766,8 +691,8 @@ internal sealed class ToolbarView : Border
         foreach (var (key, chip) in _swatches)
         {
             bool active = key.Equals(hex, StringComparison.OrdinalIgnoreCase);
-            chip.BorderBrush = active ? Brushes.White : Palette.Line;
-            chip.BorderThickness = new Thickness(active ? 2.2 : 1.2);
+            chip.BorderBrush = active ? Palette.Text : Palette.LineStrong;
+            chip.BorderThickness = new Thickness(active ? 2 : 1);
         }
     }
 
@@ -775,7 +700,12 @@ internal sealed class ToolbarView : Border
     {
         double nearest = _sizes.Keys.OrderBy(size => Math.Abs(size - stroke)).First();
         foreach (var (size, chip) in _sizes)
-            chip.Background = Math.Abs(size - nearest) < 0.1 ? Palette.Accent : Brushes.Transparent;
+        {
+            bool active = Math.Abs(size - nearest) < 0.1;
+            chip.Background = active ? Palette.ActiveSurface : Brushes.Transparent;
+            if (chip.Child is Ellipse dot)
+                dot.Fill = active ? Palette.Ink : Palette.Text;
+        }
     }
 
     private void HighlightFill(ShapeFillMode mode)
@@ -783,19 +713,8 @@ internal sealed class ToolbarView : Border
         foreach (var (key, chip) in _fills)
         {
             bool active = key == mode;
-            chip.Background = active ? Palette.Accent : Brushes.Transparent;
-            PaintInk(chip, active ? Brushes.White : Palette.Text, active ? Brushes.White : Palette.Text);
-        }
-    }
-
-    private void HighlightFont(double fontSize)
-    {
-        double nearest = _fonts.Keys.OrderBy(pt => Math.Abs(pt - fontSize)).First();
-        foreach (var (pt, chip) in _fonts)
-        {
-            bool active = Math.Abs(pt - nearest) < 0.1;
-            chip.Background = active ? Palette.Accent : Brushes.Transparent;
-            PaintInk(chip, active ? Brushes.White : Palette.Text, active ? Brushes.White : Palette.Text);
+            chip.Background = active ? Palette.ActiveSurface : Brushes.Transparent;
+            PaintTextOnly(chip, active ? Palette.Ink : Palette.Muted);
         }
     }
 
@@ -804,8 +723,8 @@ internal sealed class ToolbarView : Border
         foreach (var (key, chip) in _backdrops)
         {
             bool active = key == preset;
-            chip.Background = active ? Palette.Accent : Brushes.Transparent;
-            PaintTextOnly(chip, active ? Brushes.White : Palette.Text);
+            chip.Background = active ? Palette.ActiveSurface : Brushes.Transparent;
+            PaintTextOnly(chip, active ? Palette.Ink : Palette.Muted);
         }
     }
 
@@ -842,11 +761,22 @@ internal sealed class ToolbarView : Border
         }
     }
 
-    private static Shape Icon(string geometry, bool filled = false, double size = 16) => new Path
+    private static TextBlock MiniLabel(string text, double size = 12) => new()
+    {
+        Text = text,
+        Foreground = Palette.Text,
+        FontFamily = Palette.Font,
+        FontSize = size,
+        FontWeight = FontWeights.SemiBold,
+        HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private static Shape Icon(string geometry, bool filled = false, double size = 14.5) => new Path
     {
         Data = Geometry.Parse(geometry),
         Stroke = Palette.Text,
-        StrokeThickness = 1.65,
+        StrokeThickness = 1.6,
         Fill = filled ? Palette.Text : Brushes.Transparent,
         Stretch = Stretch.Uniform,
         Width = size,

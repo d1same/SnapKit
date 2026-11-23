@@ -12,9 +12,11 @@ namespace SnapKit;
 /// </summary>
 internal sealed class OcrSelectWindow : Window
 {
-    private static readonly SolidColorBrush Idle = Palette.Freeze(10, 132, 255, 0x38);
-    private static readonly SolidColorBrush Hot = Palette.Freeze(10, 132, 255, 0x66);
-    private static readonly SolidColorBrush On = Palette.Freeze(10, 132, 255, 0xB0);
+    private static readonly SolidColorBrush Idle = Palette.Freeze(242, 242, 242, 0x26);
+    private static readonly SolidColorBrush Hot = Palette.Freeze(242, 242, 242, 0x48);
+    private static readonly SolidColorBrush On = Palette.Freeze(242, 242, 242, 0x72);
+    private static readonly SolidColorBrush BoxEdge = Palette.Freeze(21, 21, 21, 0x88);
+    private static readonly SolidColorBrush BoxEdgeOn = Palette.Freeze(242, 242, 242, 0xE6);
 
     private readonly PixelBuffer _image;
     private readonly OcrPage _page;
@@ -310,9 +312,12 @@ internal sealed class OcrSelectWindow : Window
     {
         for (int i = 0; i < _boxes.Count; i++)
         {
-            _boxes[i].Background = _selected.Contains(i)
+            bool selected = _selected.Contains(i);
+            _boxes[i].Background = selected
                 ? On
                 : i == _hover ? Hot : Idle;
+            _boxes[i].BorderBrush = selected ? BoxEdgeOn : BoxEdge;
+            _boxes[i].BorderThickness = new Thickness(1);
         }
     }
 
@@ -344,16 +349,19 @@ internal sealed class OcrSelectWindow : Window
     {
         if (string.IsNullOrWhiteSpace(text))
         {
+            _status.Foreground = Palette.Muted;
             _status.Text = "No text in that selection.";
             return;
         }
         try
         {
             Clipboard.SetText(text);
-            _status.Text = "Copied. Paste it anywhere.";
+            _status.Foreground = Palette.Copied;
+            _status.Text = "Copied! Paste it anywhere.";
         }
         catch
         {
+            _status.Foreground = Palette.Warning;
             _status.Text = "The clipboard is busy. Try Copy all again.";
         }
     }

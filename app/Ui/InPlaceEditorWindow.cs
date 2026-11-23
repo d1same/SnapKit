@@ -13,7 +13,8 @@ internal sealed class InPlaceEditorWindow : Window
     private readonly ToolbarView _toolbar;
     private readonly Rectangle _frameInk;
     private readonly Rectangle _frame;
-    private readonly Border[] _handles;
+    private readonly Border[] _cornerHandles;
+    private readonly Border[] _edgeHandles;
     private readonly Canvas _canvas;
     private readonly MonitorInfo _monitor;
     private readonly int _originX;
@@ -22,6 +23,7 @@ internal sealed class InPlaceEditorWindow : Window
     private bool _discard;
     private int _placedW = -1;
     private int _placedH = -1;
+    private double _placedToolW = -1;
     private double _placedToolH = -1;
     private SelectionEdge? _adjust;
     private IntRect _adjustStart;
@@ -51,14 +53,23 @@ internal sealed class InPlaceEditorWindow : Window
         _surface = new ShotSurface(session.Document);
         _toolbar = new ToolbarView(showFit: false);
         _frameInk = Dash(Brushes.Black, 4);
-        _frame = Dash(Brushes.White, 0);
-        _handles = new[] { Handle(), Handle(), Handle(), Handle() };
+        _frame = Dash(Palette.Text, 0);
+        _cornerHandles = new[] { CornerHandle(), CornerHandle(), CornerHandle(), CornerHandle() };
+        _edgeHandles = new[]
+        {
+            EdgeHandle(horizontal: true),  // North
+            EdgeHandle(horizontal: true),  // South
+            EdgeHandle(horizontal: false), // West
+            EdgeHandle(horizontal: false)  // East
+        };
         Wire();
         _canvas = new Canvas { Background = Brushes.Transparent };
         _canvas.Children.Add(_surface);
         _canvas.Children.Add(_frameInk);
         _canvas.Children.Add(_frame);
-        foreach (var handle in _handles)
+        foreach (var handle in _cornerHandles)
+            _canvas.Children.Add(handle);
+        foreach (var handle in _edgeHandles)
             _canvas.Children.Add(handle);
         _canvas.Children.Add(_toolbar);
         Content = _canvas;
@@ -87,7 +98,6 @@ internal sealed class InPlaceEditorWindow : Window
             }
             FinishAdjust(null);
         };
-        _session.Flash("Drag a corner to resize · Drag edge to move · Copy copies & closes");
         Closed += (_, _) =>
         {
             if (!_discard)
@@ -129,7 +139,8 @@ internal sealed class InPlaceEditorWindow : Window
         {
             _session.SetColor(hex);
             _surface.ColorHex = _session.ColorHex;
-            _surface.RestyleSelection(_session.ColorHex, null, null);
+            _surface.RedactColorHex = _session.RedactColorHex;
+            _surface.RestyleSelection(_session.ActiveColorHex, null, null);
         };
         _toolbar.StrokePicked += size =>
         {
@@ -137,11 +148,11 @@ internal sealed class InPlaceEditorWindow : Window
             _surface.StrokeWidth = _session.Stroke;
             _surface.RestyleSelection(null, _session.Stroke, null);
         };
-        _toolbar.FontPicked += size =>
+        _toolbar.FontStepped += delta =>
         {
-            _session.SetFontSize(size);
-            _surface.FontSize = size;
-            _surface.RestyleSelection(null, null, size);
+            _session.StepFontSize(delta);
+            _surface.FontSize = _session.FontSize;
+            _surface.RestyleSelection(null, null, _session.FontSize);
         };
         _toolbar.FillModePicked += mode =>
         {
@@ -152,7 +163,7 @@ internal sealed class InPlaceEditorWindow : Window
         _toolbar.BackdropPicked += preset => _session.SetBackdrop(preset);
         _surface.ColorPicked += hex =>
         {
-            _session.SetColor(hex);
+            _session.PickColorFromPixel(hex);
             _surface.ColorHex = _session.ColorHex;
         };
         _surface.SelectionChanged += mark => _session.SetSelectedKind(mark?.Kind);
@@ -164,7 +175,7 @@ internal sealed class InPlaceEditorWindow : Window
             _session.ClearAll();
         };
         _toolbar.ResetStepClicked += () => _session.ResetStep();
-        ShotMenu.Attach(_surface, _surface, _session, this);
+        ShotMenu.Attach(_surface, _surface, _session, this, RunOcr, Pin, Discard);
         _toolbar.CopyClicked += () =>
         {
             _surface.CommitEditing();
@@ -175,24 +186,22 @@ internal sealed class InPlaceEditorWindow : Window
             _surface.CommitEditing();
             _session.Save(this);
         };
-        _toolbar.QuickSaveClicked += () =>
-        {
-            _surface.CommitEditing();
-            _session.QuickSave();
-        };
-        _toolbar.OcrClicked += () =>
-        {
-            _surface.CommitEditing();
-            OcrFlow.Start(_session.Document.ComposeUnderlay(), _session.Flash, this, () => _session.State.Settings.CloseOnClickAway);
-        };
+        _toolbar.OcrClicked += RunOcr;
         _toolbar.PinClicked += Pin;
         _toolbar.CloseClicked += Discard;
+    }
+
+    private void RunOcr()
+    {
+        _surface.CommitEditing();
+        OcrFlow.Start(_session.Document.ComposeUnderlay(), message => _session.Flash(message), this, () => _session.State.Settings.CloseOnClickAway);
     }
 
     private void ApplySession()
     {
         _surface.Tool = _session.Tool;
         _surface.ColorHex = _session.ColorHex;
+        _surface.RedactColorHex = _session.RedactColorHex;
         _surface.StrokeWidth = _session.Stroke;
         _surface.FontSize = _session.FontSize;
         _surface.FillMode = _session.FillMode;
@@ -206,12 +215,12 @@ internal sealed class InPlaceEditorWindow : Window
         if (!IsVisible && _placedW < 0)
             return;
         double scale = _monitor.Scale <= 0 ? 1 : _monitor.Scale;
-        double maxDip = Math.Max(_session.Document.View.Width / scale, 640);
-        maxDip = Math.Min(maxDip, Math.Max(320, (_monitor.Width - 24) / scale));
+        double maxDip = Math.Min(Math.Max(320, (_monitor.Width - 24) / scale), Math.Max(_session.Document.View.Width / scale, 960));
         _toolbar.MaxWidth = maxDip;
         _toolbar.Measure(new Size(maxDip, double.PositiveInfinity));
         bool sizeChanged = _session.Document.View.Width != _placedW
             || _session.Document.View.Height != _placedH
+            || Math.Abs(_toolbar.DesiredSize.Width - _placedToolW) > 4
             || Math.Abs(_toolbar.DesiredSize.Height - _placedToolH) > 2;
         if (sizeChanged)
             Place();
@@ -227,10 +236,10 @@ internal sealed class InPlaceEditorWindow : Window
 
         _surface.SetPixelScale(scale);
 
-        double maxDip = Math.Max(imgW / scale, 640);
-        maxDip = Math.Min(maxDip, Math.Max(320, (_monitor.Width - 24) / scale));
+        double maxDip = Math.Min(Math.Max(320, (_monitor.Width - 24) / scale), Math.Max(imgW / scale, 960));
         _toolbar.MaxWidth = maxDip;
         _toolbar.Measure(new Size(maxDip, double.PositiveInfinity));
+        _placedToolW = _toolbar.DesiredSize.Width;
         _placedToolH = _toolbar.DesiredSize.Height;
         int gapPx = (int)Math.Ceiling(8 * scale);
         int toolW = Math.Max(1, (int)Math.Ceiling(_toolbar.DesiredSize.Width * scale));
@@ -288,30 +297,58 @@ internal sealed class InPlaceEditorWindow : Window
 
     private void PlaceHandles(double left, double top, double width, double height)
     {
-        const double size = 12;
-        var spots = new[]
+        const double size = 10;
+        var corners = new[]
         {
-            (left + 3, top + 3),
-            (left + width - size - 3, top + 3),
-            (left + width - size - 3, top + height - size - 3),
-            (left + 3, top + height - size - 3)
+            (left + 2, top + 2),
+            (left + width - size - 2, top + 2),
+            (left + width - size - 2, top + height - size - 2),
+            (left + 2, top + height - size - 2)
         };
-        for (int i = 0; i < _handles.Length; i++)
+        for (int i = 0; i < _cornerHandles.Length; i++)
         {
-            Canvas.SetLeft(_handles[i], spots[i].Item1);
-            Canvas.SetTop(_handles[i], spots[i].Item2);
-            Panel.SetZIndex(_handles[i], 6);
+            Canvas.SetLeft(_cornerHandles[i], corners[i].Item1);
+            Canvas.SetTop(_cornerHandles[i], corners[i].Item2);
+            Panel.SetZIndex(_cornerHandles[i], 6);
         }
+
+        // Mid-edge N / S / W / E resize handles (hide if shot is very narrow/short)
+        bool showNS = width >= 54;
+        bool showEW = height >= 54;
+        PlaceEdgeHandle(_edgeHandles[0], left + (width - 18) / 2, top + 2, showNS);               // North
+        PlaceEdgeHandle(_edgeHandles[1], left + (width - 18) / 2, top + height - 8, showNS);      // South
+        PlaceEdgeHandle(_edgeHandles[2], left + 2, top + (height - 18) / 2, showEW);              // West
+        PlaceEdgeHandle(_edgeHandles[3], left + width - 8, top + (height - 18) / 2, showEW);      // East
     }
 
-    private static Border Handle() => new()
+    private static void PlaceEdgeHandle(Border handle, double x, double y, bool visible)
     {
-        Width = 12,
-        Height = 12,
+        handle.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        Canvas.SetLeft(handle, x);
+        Canvas.SetTop(handle, y);
+        Panel.SetZIndex(handle, 6);
+    }
+
+    private static Border CornerHandle() => new()
+    {
+        Width = 10,
+        Height = 10,
+        CornerRadius = new CornerRadius(2.5),
+        Background = Palette.Text,
+        BorderBrush = Palette.Ink,
+        BorderThickness = new Thickness(1.2),
+        IsHitTestVisible = false,
+        SnapsToDevicePixels = true
+    };
+
+    private static Border EdgeHandle(bool horizontal) => new()
+    {
+        Width = horizontal ? 18 : 6,
+        Height = horizontal ? 6 : 18,
         CornerRadius = new CornerRadius(3),
-        Background = Brushes.White,
-        BorderBrush = Palette.Accent,
-        BorderThickness = new Thickness(1.5),
+        Background = Palette.Text,
+        BorderBrush = Palette.Ink,
+        BorderThickness = new Thickness(1),
         IsHitTestVisible = false,
         SnapsToDevicePixels = true
     };
@@ -389,12 +426,16 @@ internal sealed class InPlaceEditorWindow : Window
         double y = dip.Y - top;
         if (x < -8 || y < -8 || x > width + 8 || y > height + 8)
             return null;
-        const double corner = 18;
+
+        const double corner = 16;
         const double edge = 12;
+        const double midHalf = 16;
+
         bool nearLeft = x <= corner;
         bool nearRight = x >= width - corner;
         bool nearTop = y <= corner;
         bool nearBottom = y >= height - corner;
+
         if (nearLeft && nearTop)
             return SelectionEdge.NorthWest;
         if (nearRight && nearTop)
@@ -403,6 +444,24 @@ internal sealed class InPlaceEditorWindow : Window
             return SelectionEdge.SouthEast;
         if (nearLeft && nearBottom)
             return SelectionEdge.SouthWest;
+
+        double midX = width / 2;
+        double midY = height / 2;
+        if (width >= 54 && Math.Abs(x - midX) <= midHalf)
+        {
+            if (y <= edge)
+                return SelectionEdge.North;
+            if (y >= height - edge)
+                return SelectionEdge.South;
+        }
+        if (height >= 54 && Math.Abs(y - midY) <= midHalf)
+        {
+            if (x <= edge)
+                return SelectionEdge.West;
+            if (x >= width - edge)
+                return SelectionEdge.East;
+        }
+
         if (x <= edge || y <= edge || x >= width - edge || y >= height - edge)
             return SelectionEdge.Move;
         return null;
@@ -411,6 +470,8 @@ internal sealed class InPlaceEditorWindow : Window
     private static Cursor? CursorFor(SelectionEdge? edge) => edge switch
     {
         SelectionEdge.Move => Cursors.SizeAll,
+        SelectionEdge.North or SelectionEdge.South => Cursors.SizeNS,
+        SelectionEdge.East or SelectionEdge.West => Cursors.SizeWE,
         SelectionEdge.NorthWest or SelectionEdge.SouthEast => Cursors.SizeNWSE,
         SelectionEdge.NorthEast or SelectionEdge.SouthWest => Cursors.SizeNESW,
         _ => null

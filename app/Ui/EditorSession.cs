@@ -43,18 +43,23 @@ internal sealed class EditorSession
     public AppState State { get; }
     public EditorTool Tool { get; private set; } = EditorTool.Arrow;
     public string ColorHex { get; private set; } = "#FF3B30";
+    public string RedactColorHex { get; private set; } = "#151515";
     public double Stroke { get; private set; } = 3;
     public double FontSize { get; private set; } = 18;
     public ShapeFillMode FillMode { get; private set; } = ShapeFillMode.Outline;
     public AnnotationKind? SelectedKind { get; private set; }
     public double? ZoomPercent { get; private set; }
-    public string Status { get; private set; } = "Copy copies the shot and closes it. Esc closes it too.";
+    public bool IsCopiedFeedback { get; private set; }
+    public string Status { get; private set; } = "";
     public event Action? Changed;
     public event Action? Delivered;
+
+    public string ActiveColorHex => Tool == EditorTool.Redact ? RedactColorHex : ColorHex;
 
     public void SelectTool(EditorTool tool)
     {
         Tool = tool;
+        IsCopiedFeedback = false;
         State.Settings.LastTool = tool.ToString();
         PersistStyle();
         Status = HintFor(tool);
@@ -63,14 +68,41 @@ internal sealed class EditorSession
 
     public void SetColor(string hex)
     {
+        IsCopiedFeedback = false;
+        if (Tool == EditorTool.Redact)
+        {
+            RedactColorHex = HexColor.Normalize(hex, RedactColorHex);
+            Changed?.Invoke();
+            return;
+        }
         ColorHex = HexColor.Normalize(hex, ColorHex);
         State.Settings.LastColorHex = ColorHex;
         PersistStyle();
         Changed?.Invoke();
     }
 
+    public void PickColorFromPixel(string hex)
+    {
+        ColorHex = HexColor.Normalize(hex, ColorHex);
+        State.Settings.LastColorHex = ColorHex;
+        PersistStyle();
+        try
+        {
+            Clipboard.SetText(ColorHex);
+            IsCopiedFeedback = true;
+            Status = $"Copied {ColorHex}!";
+        }
+        catch
+        {
+            IsCopiedFeedback = false;
+            Status = $"Picked {ColorHex}";
+        }
+        Changed?.Invoke();
+    }
+
     public void SetStroke(double stroke)
     {
+        IsCopiedFeedback = false;
         Stroke = Math.Clamp(stroke, 1, 16);
         State.Settings.LastStroke = Stroke;
         PersistStyle();
@@ -79,14 +111,18 @@ internal sealed class EditorSession
 
     public void SetFontSize(double size)
     {
-        FontSize = Math.Clamp(size, 8, 72);
+        IsCopiedFeedback = false;
+        FontSize = Math.Clamp(size, 10, 64);
         State.Settings.LastFontSize = FontSize;
         PersistStyle();
         Changed?.Invoke();
     }
 
+    public void StepFontSize(double delta) => SetFontSize(FontSize + delta);
+
     public void SetFillMode(ShapeFillMode mode)
     {
+        IsCopiedFeedback = false;
         FillMode = mode;
         State.Settings.LastFillMode = mode;
         PersistStyle();
@@ -95,12 +131,11 @@ internal sealed class EditorSession
 
     public void SetBackdrop(BackdropPreset preset)
     {
+        IsCopiedFeedback = false;
         Document.SetBackdrop(preset);
         State.Settings.LastBackdrop = preset;
         PersistStyle();
-        Status = preset == BackdropPreset.None
-            ? "Frame removed."
-            : $"{preset} docs frame applied.";
+        Status = preset == BackdropPreset.None ? "Frame off" : $"{preset} frame";
         Changed?.Invoke();
     }
 
@@ -120,27 +155,30 @@ internal sealed class EditorSession
 
     public void ClearAll()
     {
+        IsCopiedFeedback = false;
         if (!Document.ClearAnnotations())
         {
-            Flash("Nothing to clear.");
+            Flash("No marks to clear.");
             return;
         }
         SelectedKind = null;
-        Flash("Cleared all marks. Ctrl+Z restores them.");
+        Flash("Cleared marks (Ctrl+Z undoes)");
     }
 
     public void ResetStep()
     {
+        IsCopiedFeedback = false;
         if (!Document.ResetNumbering())
         {
-            Flash("Step numbering is already at #1.");
+            Flash("Step is already #1");
             return;
         }
-        Flash("Next step reset to #1.");
+        Flash("Step reset to #1");
     }
 
-    public void Flash(string status)
+    public void Flash(string status, bool copied = false)
     {
+        IsCopiedFeedback = copied;
         Status = status;
         Changed?.Invoke();
     }
@@ -157,11 +195,11 @@ internal sealed class EditorSession
         var bitmap = Render();
         if (!ImageFile.Copy(bitmap))
         {
-            Flash("Clipboard is busy. Click Copy again.");
+            Flash("Clipboard busy — try Copy again.");
             return;
         }
         State.Recent.Update(Recent, BitmapConvert.ToPixelBuffer(bitmap));
-        Flash("Copied. Paste it anywhere.");
+        Flash("Copied!", copied: true);
         Delivered?.Invoke();
     }
 
@@ -171,7 +209,7 @@ internal sealed class EditorSession
         if (!ImageFile.Save(bitmap, owner))
             return false;
         State.Recent.Update(Recent, BitmapConvert.ToPixelBuffer(bitmap));
-        Flash("Saved.");
+        Flash("Saved");
         Delivered?.Invoke();
         return true;
     }
@@ -218,17 +256,15 @@ internal sealed class EditorSession
 
     private static string HintFor(EditorTool tool) => tool switch
     {
-        EditorTool.Select => "Drag to move · Drag handles to resize · Arrows nudge · Ctrl+D duplicates",
-        EditorTool.Text => "Click to type text · Ctrl+Enter finishes · Esc cancels",
-        EditorTool.Callout => "Drag from the pointer tip to the note bubble",
-        EditorTool.Number => "Click to drop the next step number",
-        EditorTool.Crop => "Drag the area you want to keep",
-        EditorTool.Picker => "Click any pixel to pick its hex color",
-        EditorTool.Blur => "Drag a box to pixelate sensitive details",
-        EditorTool.Redact => "Drag a box to permanently block out sensitive text",
-        EditorTool.Spotlight => "Drag a box · Everything outside it dims",
-        EditorTool.Rectangle or EditorTool.Ellipse => "Drag to draw · Hold Shift for a square/circle",
-        EditorTool.Arrow => "Drag to point · Hold Shift for 45° angles",
-        _ => "Copy copies and closes · Ctrl+Shift+S quick-saves · Esc closes"
+        EditorTool.Select => "Drag handles to resize · Arrows nudge · Ctrl+D duplicates",
+        EditorTool.Text => "Click to type · Ctrl+Enter commits",
+        EditorTool.Callout => "Drag tip to note",
+        EditorTool.Number => "Click to place step",
+        EditorTool.Crop => "Drag area to keep",
+        EditorTool.Picker => "Click pixel to pick & copy hex",
+        EditorTool.Blur => "Drag box to pixelate",
+        EditorTool.Redact => "Drag box to blackout",
+        EditorTool.Spotlight => "Drag box to spotlight",
+        _ => ""
     };
 }

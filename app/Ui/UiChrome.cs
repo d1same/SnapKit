@@ -32,6 +32,7 @@ internal static class UiChrome
         {
             Content = label,
             Template = FlatButtonTemplate,
+            FocusVisualStyle = null,
             Background = bg,
             Foreground = fg,
             BorderBrush = border,
@@ -45,7 +46,6 @@ internal static class UiChrome
             OverridesDefaultStyle = true,
             MinWidth = minWidth
         };
-        button.Tag = hover;
         button.MouseEnter += (_, _) =>
         {
             if (button.IsEnabled)
@@ -54,7 +54,7 @@ internal static class UiChrome
         button.MouseLeave += (_, _) => button.Background = bg;
         button.IsEnabledChanged += (_, _) =>
         {
-            button.Opacity = button.IsEnabled ? 1.0 : 0.48;
+            button.Opacity = button.IsEnabled ? 1.0 : 0.45;
             if (!button.IsEnabled)
                 button.Background = bg;
         };
@@ -66,7 +66,7 @@ internal static class UiChrome
         Background = Palette.Card,
         BorderBrush = Palette.Line,
         BorderThickness = new Thickness(1),
-        CornerRadius = new CornerRadius(11),
+        CornerRadius = new CornerRadius(10),
         Padding = padding ?? new Thickness(14, 12, 14, 12),
         SnapsToDevicePixels = true,
         Child = child
@@ -86,7 +86,7 @@ internal static class UiChrome
             Text = text,
             Foreground = fg ?? Palette.Text,
             FontFamily = mono ? Palette.Mono : Palette.Font,
-            FontSize = mono ? 12 : 11.5,
+            FontSize = mono ? 11.5 : 11.5,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
         }
@@ -100,8 +100,8 @@ internal static class UiChrome
             Width = 38,
             Height = 22,
             CornerRadius = new CornerRadius(11),
-            Background = state ? Palette.Accent : Palette.Elevated,
-            BorderBrush = state ? Palette.Accent : Palette.Line,
+            Background = state ? Palette.ActiveSurface : Palette.Elevated,
+            BorderBrush = state ? Palette.ActiveSurface : Palette.LineStrong,
             BorderThickness = new Thickness(1),
             VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true
@@ -110,7 +110,7 @@ internal static class UiChrome
         {
             Width = 16,
             Height = 16,
-            Fill = Brushes.White,
+            Fill = state ? Palette.Ink : Palette.Muted,
             HorizontalAlignment = state ? HorizontalAlignment.Right : HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(2)
@@ -149,18 +149,19 @@ internal static class UiChrome
         var row = new Border
         {
             Background = Brushes.Transparent,
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(7),
             Padding = new Thickness(6, 7, 6, 7),
             Cursor = Cursors.Hand,
             Child = grid
         };
-        row.MouseEnter += (_, _) => row.Background = Palette.Group;
+        row.MouseEnter += (_, _) => row.Background = Palette.Elevated;
         row.MouseLeave += (_, _) => row.Background = Brushes.Transparent;
         row.MouseLeftButtonUp += (_, e) =>
         {
             state = !state;
-            track.Background = state ? Palette.Accent : Palette.Elevated;
-            track.BorderBrush = state ? Palette.Accent : Palette.Line;
+            track.Background = state ? Palette.ActiveSurface : Palette.Elevated;
+            track.BorderBrush = state ? Palette.ActiveSurface : Palette.LineStrong;
+            knob.Fill = state ? Palette.Ink : Palette.Muted;
             knob.HorizontalAlignment = state ? HorizontalAlignment.Right : HorizontalAlignment.Left;
             onChanged(state);
             e.Handled = true;
@@ -172,17 +173,17 @@ internal static class UiChrome
     {
         bar = new ProgressBar
         {
-            Height = 8,
+            Height = 6,
             Minimum = 0,
             Maximum = 100,
-            Foreground = Palette.Accent,
+            Foreground = Palette.ActiveSurface,
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(0)
         };
         return new Border
         {
             Background = Palette.Elevated,
-            CornerRadius = new CornerRadius(4),
+            CornerRadius = new CornerRadius(3),
             ClipToBounds = true,
             SnapsToDevicePixels = true,
             Child = bar
@@ -192,17 +193,17 @@ internal static class UiChrome
     public static TextBlock SectionLabel(string text) => new()
     {
         Text = text.ToUpperInvariant(),
-        Foreground = Palette.Subtle,
+        Foreground = Palette.Muted,
         FontFamily = Palette.Font,
-        FontSize = 11,
+        FontSize = 10.5,
         FontWeight = FontWeights.SemiBold,
-        Margin = new Thickness(2, 12, 0, 6)
+        Margin = new Thickness(2, 14, 0, 6)
     };
 
     private static (SolidColorBrush Bg, SolidColorBrush Hover, SolidColorBrush Fg, SolidColorBrush Border) ColorsFor(ButtonTone tone) => tone switch
     {
-        ButtonTone.Primary => (Palette.Accent, Palette.AccentHover, Palette.Text, Palette.Accent),
-        ButtonTone.Ghost => (Brushes.Transparent == null ? Palette.Card : Palette.Freeze(0, 0, 0, 0), Palette.Hover, Palette.Text, Palette.Freeze(0, 0, 0, 0)),
+        ButtonTone.Primary => (Palette.ActiveSurface, Palette.ActiveHover, Palette.Ink, Palette.ActiveSurface),
+        ButtonTone.Ghost => (Palette.Freeze(0, 0, 0, 0), Palette.Hover, Palette.Muted, Palette.Freeze(0, 0, 0, 0)),
         ButtonTone.Danger => (Palette.DangerSoft, Palette.Danger, Palette.Text, Palette.Danger),
         _ => (Palette.Elevated, Palette.Hover, Palette.Text, Palette.Line)
     };
@@ -210,7 +211,7 @@ internal static class UiChrome
     private static ControlTemplate BuildButtonTemplate()
     {
         var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
         border.SetBinding(Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
         border.SetBinding(Border.BorderBrushProperty, new System.Windows.Data.Binding("BorderBrush") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
         border.SetBinding(Border.BorderThicknessProperty, new System.Windows.Data.Binding("BorderThickness") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });

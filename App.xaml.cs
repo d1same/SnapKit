@@ -34,6 +34,7 @@ public partial class App : System.Windows.Application
         }
 
         _firstRun = HasArg(e.Args, "--first-run");
+        bool updated = HasArg(e.Args, "--updated");
 
         try
         {
@@ -67,8 +68,21 @@ public partial class App : System.Windows.Application
                 _state.Tray.Balloon(Brand.Name, ex.Message);
             }
         }
-        if (_firstRun)
-            _state.Tray.Balloon(Brand.Name, "Installed. SnapKit " + ReleaseClient.Display + " starts with Windows and sits next to the clock. Ctrl+Alt+Shift+Esc quits if a window gets stuck.");
+        if (updated)
+        {
+            _state.Tray.Balloon(Brand.Name, $"Updated to {Brand.Name} v{ReleaseClient.Display}.");
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                ReleaseClient.CleanupTempDownloads();
+            });
+        }
+        else
+        {
+            if (_firstRun)
+                _state.Tray.Balloon(Brand.Name, "Installed. SnapKit " + ReleaseClient.Display + " starts with Windows and sits next to the clock. Ctrl+Alt+Shift+Esc quits if a window gets stuck.");
+            _ = Task.Run(ReleaseClient.CleanupTempDownloads);
+        }
         UpdateCheck.Queue();
     }
 
@@ -127,6 +141,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        UpdateCheck.Stop();
         _state?.Hotkeys.Dispose();
         _state?.Tray?.Dispose();
         if (_mutex != null)

@@ -67,8 +67,8 @@ internal sealed class OcrWindow : Window
                 try
                 {
                     Clipboard.SetText(body);
-                    statusLabel.Foreground = Palette.Success;
-                    statusLabel.Text = "Copied to clipboard.";
+                    statusLabel.Foreground = Palette.Copied;
+                    statusLabel.Text = "Copied!";
                 }
                 catch
                 {

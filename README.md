@@ -14,7 +14,7 @@ Download `SnapKit-win-x64.zip` from that release. Unzip it and run `SnapKit.exe`
 
 That first run installs SnapKit for the current user. A non-blocking progress window stays responsive while it copies, so the install is never a silent pause. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip shows **Updating SnapKit**, closes whatever SnapKit is already running, and replaces it.
 
-This build is **0.2.0**. After it is running it checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, a badge appears on the tray icon and menu, and an update window shows both versions along with the GitHub release notes. **Update now** streams the download with live progress percentage, and the new copy shows the install window while replacing the old one. Both the tray menu and Settings also have **Check for updates**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
+This build is **0.2.0**. After it is running it periodically checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, a badge appears on the tray icon and menu, and an update window shows both versions along with the GitHub release notes. **Update now** streams the download into a versioned temp folder with live `%` and MB progress, then the new copy shows a non-blocking install window while replacing the old one and relaunches with an `--updated` toast and automatic temp cleanup. Both the tray menu and Settings also have **Check for updates…**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -24,7 +24,7 @@ Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **R
 
 Left-click the tray icon to capture an area. Right-click for the menu.
 
-You drag a box around a dialog, press `T`, type "Click Save", then press the electric-blue **Copy** button on the toolbar. Paste it into chat, email, or a ticket. Right-click offers Copy, Quick save, Save as, Duplicate, and Clear all. A file appears only if you press `Ctrl+S`, `Ctrl+Shift+S`, Save, or Quick.
+You drag a box around a dialog, press `T`, type "Click Save", then press the crisp white **Copy** button on the floating rail. Paste it into chat, email, or a ticket. Right-click offers Copy, Quick Save, Save as…, Copy Text (OCR), Pin, Toggle Frame, Clear Marks, and Close. A file appears only if you press `Ctrl+S`, `Ctrl+Shift+S`, or Save.
 
 ### Tray menu
 
@@ -34,10 +34,10 @@ You drag a box around a dialog, press `T`, type "Click Save", then press the ele
 - Full screen (the monitor under the cursor)
 - All monitors
 - Scrolling capture
-- Delayed capture (3 seconds or 5 seconds)
+- Delayed capture (3 seconds, 5 seconds, or 10 seconds)
 - OCR (drag an area, text goes to the clipboard)
 - Recent captures (last 10, memory only)
-- Check for updates (shows an update indicator dot when a newer version is available)
+- Check for updates… (highlights with an indicator dot when an update is available)
 - Settings / Shortcuts
 - Exit
 
@@ -49,17 +49,17 @@ A bar stays at the top of the screen: the tab or folder, the window, and **Entir
 - `Enter` captures the highlighted target, or the monitor in full-screen mode.
 - `Esc` or right-click cancels.
 
-The shot stays where you took it. Drag a corner to make it smaller or bigger, or drag the edge to move it, before you draw or copy. The rest of that screen is darkened, and one dashed line stays on the edge of the shot until you copy it, save it, press `Esc`, or click outside it. Turn click-away off in Settings if you want a click there to leave the shot open. `Ctrl+Alt+Shift+Esc` quits SnapKit if a window is stuck.
+The shot stays where you took it. Drag any corner or mid-edge (`N`/`S`/`E`/`W`) handle to resize it, or drag the edge to move it, before you draw or copy. The rest of that screen is darkened, and one dashed line stays on the edge of the shot until you copy it, save it, press `Esc`, or click outside it. Turn click-away off in Settings if you want a click there to leave the shot open. `Ctrl+Alt+Shift+Esc` quits SnapKit if a window is stuck.
 
 A selection stays on one monitor. Use **All monitors** for a combined shot.
 
 ### Editor
 
-The floating toolbar groups tools by category, shows only the style controls relevant to the active tool or selection, highlights **Copy** in electric blue, and displays live pixel dimensions (and Docs Backdrop frame dimensions) in the footer. Tool, color, stroke, text size, shape fill mode, and docs backdrop frame defaults persist automatically between captures.
+The ultra-minimal floating rail keeps all tools on one slim row (icons with subtle shortcut letters, Undo/Redo/Clear, OCR/Pin/Save, live zoom controls in EditorWindow, and a crisp white **Copy** button on the right), with a compact detached options pill underneath showing only the contextual controls for the active tool or selection (color swatches + `#HEX`, stroke dots, shape fill toggle, or text size stepper, plus Frame toggle and live `W×H` pixel dimensions). Tool, color, stroke, text size, shape fill mode, and docs backdrop frame defaults persist automatically between captures.
 
 | Key | Tool / Action |
 | --- | --- |
-| `V` | Select / move / resize handles |
+| `V` | Select / move / drag endpoint & corner handles |
 | `P` | Pen |
 | `A` | Arrow |
 | `R` | Rectangle (Outline / Tint / Solid fill) |
@@ -69,10 +69,10 @@ The floating toolbar groups tools by category, shows only the style controls rel
 | `C` | Callout |
 | `N` | Numbered step (1, 2, 3, … + Reset #1) |
 | `B` | Blur (pixelate) |
-| `D` | Redact (solid opaque block) |
+| `D` | Redact (blackout box) |
 | `S` | Spotlight |
 | `X` | Crop |
-| `I` | Color picker (hex) |
+| `I` | Eyedropper (picks color & auto-copies `#HEX`) |
 | `[` `]` | Thinner / thicker stroke |
 | `Shift` while drawing/resizing | Lock to 45° or a square/circle |
 | Arrow keys (`Shift` = 10px) | Nudge selected mark |
@@ -81,7 +81,7 @@ The floating toolbar groups tools by category, shows only the style controls rel
 | `Ctrl+Y` or `Ctrl+Shift+Z` | Redo |
 | `Delete` / `Backspace` | Remove the selected mark |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` / `Ctrl+1` | Zoom in / out / fit / 100% (Editor window) |
-| Right-click | Copy, Quick save, Save as, Duplicate, or Clear all |
+| Right-click | Copy, Quick Save, Save as…, Copy Text (OCR), Pin, Toggle Frame, Clear Marks, Close |
 | `Ctrl+C` | Copy the picture and close the shot |
 | `Ctrl+Shift+S` | Quick save PNG directly to your Quick Save folder and close |
 | `Ctrl+S` | Save as PNG or JPG, then close the shot |
@@ -89,7 +89,7 @@ The floating toolbar groups tools by category, shows only the style controls rel
 
 Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` while typing cancels that edit. Drag the circular handles on any selected arrow, callout, box, circle, blur, redact, or spotlight to resize or re-aim endpoints directly. Choose **Clean**, **Dark**, or **Slate** under **Frame** to wrap the export in a rounded documentation backdrop with a soft drop shadow.
 
-**Pin** floats the picture always-on-top with a hover bar (**Copy**, **Save**, opacity badge, close). Drag to move, scroll wheel to resize, `Ctrl`+scroll wheel to adjust opacity, double-click or `Ctrl+C` to copy, `Ctrl+Shift+S` to quick save, `Ctrl+S` to save as, `Ctrl+0` to reset, right-click for the context menu, and `Esc` to close.
+**Pin** floats the picture always-on-top with a hover action bar (**Copy**, **Save**, opacity badge, close). Drag to move, scroll wheel to resize, `Ctrl`+scroll wheel to adjust opacity (`20%–100%`), double-click or `Ctrl+C` to copy (with a green `"Copied!"` toast), `Ctrl+Shift+S` to quick save, `Ctrl+S` to save as, `Ctrl+0` to reset, right-click for the context menu, and `Esc` to close.
 
 OCR reads the capture on the PC, then highlights each word on the picture. The highlight sits on the word at 100%, 125%, 150%, and 200% scaling, including a monitor that is not at the top-left of the desktop. Drag across the words you want and that text is copied in reading order. `Ctrl+A` copies all of it. `Esc` closes the highlighter and leaves the capture editable. If OCR fails, the message stays in a small window with **Copy error**. OCR uses the Windows language already installed. No cloud.
 

@@ -44,7 +44,7 @@ internal sealed class PinnedWindow : Window
         };
         RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.HighQuality);
 
-        // Floating hover bar
+        // Floating hover action bar (neutral Style 3 graphite + crisp white Copy)
         _opacityText = new TextBlock
         {
             Text = "100%",
@@ -53,10 +53,10 @@ internal sealed class PinnedWindow : Window
             FontSize = 10.5,
             VerticalAlignment = VerticalAlignment.Center
         };
-        var opacityPill = HoverChip(_opacityText, "Opacity (Ctrl+Scroll to adjust, click to cycle)", CycleOpacity, accent: false);
-        var copyChip = HoverChip(HoverLabel("Copy", Brushes.White), "Copy image  (Ctrl+C or double-click)", TryCopy, accent: true);
-        var saveChip = HoverChip(HoverLabel("Save", Palette.Text), "Save image  (Ctrl+S, or Ctrl+Shift+S for Quick Save)", () => SaveAs(), accent: false);
-        var closeChip = HoverChip(HoverLabel("×", Palette.Text, 14), "Close pin  (Esc)", Close, accent: false);
+        var copyChip = HoverChip(HoverLabel("Copy", Palette.Ink), "Copy image  (Ctrl+C or double-click)", TryCopy, primary: true);
+        var saveChip = HoverChip(HoverLabel("Save", Palette.Text), "Save image  (Ctrl+S · Ctrl+Shift+S quick save)", SaveAs, primary: false);
+        var opacityPill = HoverChip(_opacityText, "Opacity (Ctrl+Scroll 20%–100%, click to cycle)", CycleOpacity, primary: false);
+        var closeChip = HoverChip(HoverLabel("×", Palette.Text, 13.5), "Close pin  (Esc)", Close, primary: false);
         closeChip.MinWidth = 24;
 
         _hoverBar = new Border
@@ -65,8 +65,8 @@ internal sealed class PinnedWindow : Window
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(8),
             Padding = new Thickness(4, 3, 4, 3),
-            CornerRadius = new CornerRadius(9),
-            Background = Palette.Freeze(0x16, 0x18, 0x1E, 0xE8),
+            CornerRadius = new CornerRadius(8),
+            Background = Palette.Toolbar,
             BorderBrush = Palette.Line,
             BorderThickness = new Thickness(1),
             Opacity = 0,
@@ -78,7 +78,7 @@ internal sealed class PinnedWindow : Window
             }
         };
 
-        // Transient status toast pill
+        // Transient status toast pill (green #22C55E exclusively for "Copied!")
         _toastText = new TextBlock
         {
             Text = "",
@@ -94,7 +94,7 @@ internal sealed class PinnedWindow : Window
             Margin = new Thickness(10),
             Padding = new Thickness(9, 4, 9, 4),
             CornerRadius = new CornerRadius(7),
-            Background = Palette.Freeze(0x14, 0x16, 0x1C, 0xEB),
+            Background = Palette.Toolbar,
             BorderBrush = Palette.Line,
             BorderThickness = new Thickness(1),
             Visibility = Visibility.Collapsed,
@@ -128,13 +128,13 @@ internal sealed class PinnedWindow : Window
             Background = Palette.Bg,
             BorderBrush = Palette.Line,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(9),
             ClipToBounds = true,
             Child = root,
             Effect = new System.Windows.Media.Effects.DropShadowEffect
             {
                 BlurRadius = 18,
-                Opacity = 0.52,
+                Opacity = 0.5,
                 ShadowDepth = 3,
                 Color = Colors.Black
             }
@@ -192,15 +192,16 @@ internal sealed class PinnedWindow : Window
             }
         };
 
-        // Clean right-click context menu (no competing MouseRightButtonUp handler)
+        // Right-click opens menu only (no competing copy handler)
         var menu = DarkMenu.Create();
         menu.Items.Add(DarkMenu.Item("Copy", TryCopy, "Ctrl+C"));
-        menu.Items.Add(DarkMenu.Item("Quick save", QuickSave, "Ctrl+Shift+S"));
+        menu.Items.Add(DarkMenu.Item("Quick Save", QuickSave, "Ctrl+Shift+S"));
         menu.Items.Add(DarkMenu.Item("Save as…", SaveAs, "Ctrl+S"));
         menu.Items.Add(DarkMenu.Separator());
         menu.Items.Add(DarkMenu.Item("Opacity 100%", () => SetOpacity(1.0)));
         menu.Items.Add(DarkMenu.Item("Opacity 75%", () => SetOpacity(0.75)));
         menu.Items.Add(DarkMenu.Item("Opacity 50%", () => SetOpacity(0.50)));
+        menu.Items.Add(DarkMenu.Item("Opacity 25%", () => SetOpacity(0.25)));
         menu.Items.Add(DarkMenu.Item("Reset size & opacity", ResetView, "Ctrl+0"));
         menu.Items.Add(DarkMenu.Separator());
         menu.Items.Add(DarkMenu.Item("Close", Close, "Esc"));
@@ -241,12 +242,12 @@ internal sealed class PinnedWindow : Window
         Top = centerY - Height / 2;
 
         double pct = Math.Round((Width / Math.Max(1, _image.PixelWidth)) * 100);
-        ShowToast($"{Math.Round(Width)} × {Math.Round(Height)}  ·  {pct:0}%");
+        ShowToast($"{Math.Round(Width)} × {Math.Round(Height)} · {pct:0}%");
     }
 
     private void SetOpacity(double value)
     {
-        Opacity = Math.Clamp(Math.Round(value, 2), 0.25, 1.0);
+        Opacity = Math.Clamp(Math.Round(value, 2), 0.20, 1.0);
         int pct = (int)Math.Round(Opacity * 100);
         _opacityText.Text = $"{pct}%";
         ShowToast($"Opacity {pct}%");
@@ -258,6 +259,8 @@ internal sealed class PinnedWindow : Window
             SetOpacity(0.75);
         else if (Opacity > 0.60)
             SetOpacity(0.50);
+        else if (Opacity > 0.30)
+            SetOpacity(0.25);
         else
             SetOpacity(1.0);
     }
@@ -272,15 +275,15 @@ internal sealed class PinnedWindow : Window
         Top = centerY - Height / 2;
         Opacity = 1.0;
         _opacityText.Text = "100%";
-        ShowToast("Reset size & opacity");
+        ShowToast("Reset");
     }
 
     private void TryCopy()
     {
         if (ImageFile.Copy(_image))
-            ShowToast("Copied to clipboard");
+            ShowToast("Copied!", copied: true);
         else
-            ShowToast("Clipboard busy — try again");
+            ShowToast("Clipboard busy");
     }
 
     private void SaveAs()
@@ -302,9 +305,11 @@ internal sealed class PinnedWindow : Window
         }
     }
 
-    private void ShowToast(string message)
+    private void ShowToast(string message, bool copied = false)
     {
         _toastText.Text = message;
+        _toastText.Foreground = copied ? Palette.Copied : Palette.Text;
+        _toast.BorderBrush = copied ? Palette.Copied : Palette.Line;
         _toast.Visibility = Visibility.Visible;
         _toastTimer.Stop();
         _toastTimer.Start();
@@ -321,10 +326,10 @@ internal sealed class PinnedWindow : Window
         VerticalAlignment = VerticalAlignment.Center
     };
 
-    private static Border HoverChip(UIElement content, string tip, Action click, bool accent)
+    private static Border HoverChip(UIElement content, string tip, Action click, bool primary)
     {
-        var idleBg = accent ? Palette.Accent : Palette.Elevated;
-        var hoverBg = accent ? Palette.AccentHover : Palette.Hover;
+        var idleBg = primary ? Palette.ActiveSurface : Palette.Elevated;
+        var hoverBg = primary ? Palette.ActiveHover : Palette.Hover;
         var chip = new Border
         {
             Height = 24,

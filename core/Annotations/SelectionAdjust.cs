@@ -4,9 +4,13 @@ public enum SelectionEdge
 {
     Move,
     NorthWest,
+    North,
     NorthEast,
+    East,
     SouthEast,
-    SouthWest
+    South,
+    SouthWest,
+    West
 }
 
 public static class SelectionAdjust
@@ -29,17 +33,29 @@ public static class SelectionAdjust
                 left = Math.Clamp(start.X + dx, 0, start.Right - min);
                 top = Math.Clamp(start.Y + dy, 0, start.Bottom - min);
                 break;
+            case SelectionEdge.North:
+                top = Math.Clamp(start.Y + dy, 0, start.Bottom - min);
+                break;
             case SelectionEdge.NorthEast:
                 right = Math.Clamp(start.Right + dx, start.X + min, boundsWidth);
                 top = Math.Clamp(start.Y + dy, 0, start.Bottom - min);
+                break;
+            case SelectionEdge.East:
+                right = Math.Clamp(start.Right + dx, start.X + min, boundsWidth);
                 break;
             case SelectionEdge.SouthEast:
                 right = Math.Clamp(start.Right + dx, start.X + min, boundsWidth);
                 bottom = Math.Clamp(start.Bottom + dy, start.Y + min, boundsHeight);
                 break;
+            case SelectionEdge.South:
+                bottom = Math.Clamp(start.Bottom + dy, start.Y + min, boundsHeight);
+                break;
             case SelectionEdge.SouthWest:
                 left = Math.Clamp(start.X + dx, 0, start.Right - min);
                 bottom = Math.Clamp(start.Bottom + dy, start.Y + min, boundsHeight);
+                break;
+            case SelectionEdge.West:
+                left = Math.Clamp(start.X + dx, 0, start.Right - min);
                 break;
         }
 

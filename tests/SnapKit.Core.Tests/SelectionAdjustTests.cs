@@ -36,4 +36,19 @@ public class SelectionAdjustTests
         var stopped = SelectionAdjust.Apply(start, SelectionEdge.NorthWest, 70, 80, 200, 200);
         Assert.Equal(new IntRect(44, 44, SelectionAdjust.MinSize, SelectionAdjust.MinSize), stopped);
     }
+
+    [Fact]
+    public void Mid_edge_drag_resizes_single_axis_within_bounds()
+    {
+        var start = new IntRect(20, 20, 40, 40);
+
+        Assert.Equal(new IntRect(20, 10, 40, 50), SelectionAdjust.Apply(start, SelectionEdge.North, 99, -10, 200, 200));
+        Assert.Equal(new IntRect(20, 20, 40, 55), SelectionAdjust.Apply(start, SelectionEdge.South, -99, 15, 200, 200));
+        Assert.Equal(new IntRect(20, 20, 65, 40), SelectionAdjust.Apply(start, SelectionEdge.East, 25, 99, 200, 200));
+        Assert.Equal(new IntRect(5, 20, 55, 40), SelectionAdjust.Apply(start, SelectionEdge.West, -15, -99, 200, 200));
+
+        // Clamps to min size and screen bounds
+        Assert.Equal(new IntRect(44, 20, SelectionAdjust.MinSize, 40), SelectionAdjust.Apply(start, SelectionEdge.West, 100, 0, 200, 200));
+        Assert.Equal(new IntRect(20, 20, 80, 40), SelectionAdjust.Apply(start, SelectionEdge.East, 500, 0, 100, 100));
+    }
 }

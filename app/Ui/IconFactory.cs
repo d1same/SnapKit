@@ -37,9 +37,9 @@ internal static class IconFactory
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.DrawIcon(baseIcon, new Rectangle(0, 0, 32, 32));
-            // Electric-blue update badge dot with dark cutout ring
-            using var ring = new SolidBrush(Color.FromArgb(255, 17, 18, 22));
-            using var dot = new SolidBrush(Color.FromArgb(255, 10, 132, 255));
+            // Crisp monochrome update badge dot with dark cutout ring
+            using var ring = new SolidBrush(Color.FromArgb(255, 21, 21, 21));
+            using var dot = new SolidBrush(Color.FromArgb(255, 242, 242, 242));
             g.FillEllipse(ring, 18, 0, 14, 14);
             g.FillEllipse(dot, 20, 2, 10, 10);
         }

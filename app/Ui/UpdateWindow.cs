@@ -55,13 +55,13 @@ internal sealed class UpdateWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(8, 0, 8, 0)
         });
-        versionRow.Children.Add(UiChrome.Pill("v" + targetVer, Palette.AccentSoft, Palette.Text, Palette.AccentLine, mono: true));
+        versionRow.Children.Add(UiChrome.Pill("v" + targetVer, Palette.ActiveSurface, Palette.Ink, Palette.ActiveSurface, mono: true));
         if (info.AssetSize > 0)
         {
             versionRow.Children.Add(new TextBlock
             {
                 Text = ReleaseClient.FormatBytes(info.AssetSize),
-                Foreground = Palette.Subtle,
+                Foreground = Palette.Muted,
                 FontFamily = Palette.Mono,
                 FontSize = 11.5,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -91,9 +91,9 @@ internal sealed class UpdateWindow : Window
         var notesHeading = new TextBlock
         {
             Text = "WHAT'S NEW",
-            Foreground = Palette.Subtle,
+            Foreground = Palette.Muted,
             FontFamily = Palette.Font,
-            FontSize = 11,
+            FontSize = 10.5,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -105,13 +105,15 @@ internal sealed class UpdateWindow : Window
             var openLink = new TextBlock
             {
                 Text = "View on GitHub ↗",
-                Foreground = Palette.Accent,
+                Foreground = Palette.Text,
                 FontFamily = Palette.Font,
                 FontSize = 11.5,
                 Cursor = Cursors.Hand,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            openLink.MouseEnter += (_, _) => openLink.TextDecorations = TextDecorations.Underline;
+            openLink.MouseLeave += (_, _) => openLink.TextDecorations = null;
             openLink.MouseLeftButtonUp += (_, _) =>
             {
                 try { Process.Start(new ProcessStartInfo(info.HtmlUrl) { UseShellExecute = true }); }

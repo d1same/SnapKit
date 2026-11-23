@@ -25,6 +25,8 @@ internal static class ReleaseClient
     public const string Owner = "d1same";
     public const string Repo = "SnapKit";
 
+    public static string TempRoot => Path.Combine(Path.GetTempPath(), "SnapKit-update");
+
     public static Version Current => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 2, 0);
 
     public static string Display
@@ -92,48 +94,63 @@ internal static class ReleaseClient
         IProgress<DownloadProgress>? progress,
         CancellationToken token = default)
     {
-        var folder = Path.Combine(Path.GetTempPath(), "SnapKit-update");
+        string safeTag = SanitizeTag(info.Tag);
+        string folder = Path.Combine(TempRoot, safeTag);
         Directory.CreateDirectory(folder);
-        var zipPath = Path.Combine(folder, "SnapKit-win-x64.zip");
-        var extractDir = Path.Combine(folder, "unpacked");
-        var exePath = Path.Combine(folder, Brand.Name + ".exe");
+
+        string partPath = Path.Combine(folder, $"SnapKit-win-x64-{Guid.NewGuid():N}.part");
+        string zipPath = Path.Combine(folder, "SnapKit-win-x64.zip");
+        string extractDir = Path.Combine(folder, "unpacked");
+        string exePath = Path.Combine(folder, Brand.Name + ".exe");
 
         progress?.Report(new DownloadProgress("Connecting to GitHub…", null, 0, info.AssetSize > 0 ? info.AssetSize : null));
 
-        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("SnapKit/" + Display);
-        using var response = await http.GetAsync(info.AssetUrl, HttpCompletionOption.ResponseHeadersRead, token);
-        response.EnsureSuccessStatusCode();
-
-        long? totalBytes = response.Content.Headers.ContentLength ?? (info.AssetSize > 0 ? info.AssetSize : null);
-        await using (var remote = await response.Content.ReadAsStreamAsync(token))
-        await using (var local = File.Create(zipPath))
+        try
         {
-            var buffer = new byte[65536];
-            long readTotal = 0;
-            long lastReportAt = 0;
-            int lastPercent = -1;
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("SnapKit/" + Display);
+            using var response = await http.GetAsync(info.AssetUrl, HttpCompletionOption.ResponseHeadersRead, token);
+            response.EnsureSuccessStatusCode();
 
-            int read;
-            while ((read = await remote.ReadAsync(buffer, token)) > 0)
+            long? totalBytes = response.Content.Headers.ContentLength ?? (info.AssetSize > 0 ? info.AssetSize : null);
+            await using (var remote = await response.Content.ReadAsStreamAsync(token))
+            await using (var local = File.Create(partPath))
             {
-                await local.WriteAsync(buffer.AsMemory(0, read), token);
-                readTotal += read;
+                var buffer = new byte[65536];
+                long readTotal = 0;
+                long lastReportAt = 0;
+                int lastPercent = -1;
 
-                double? pct = totalBytes is > 0
-                    ? Math.Clamp(readTotal * 100.0 / totalBytes.Value, 0, 100)
-                    : null;
-                int wholePct = pct.HasValue ? (int)Math.Floor(pct.Value) : -1;
-                long now = Environment.TickCount64;
-                if (now - lastReportAt >= 50 || wholePct != lastPercent)
+                int read;
+                while ((read = await remote.ReadAsync(buffer, token)) > 0)
                 {
-                    lastReportAt = now;
-                    lastPercent = wholePct;
-                    progress?.Report(new DownloadProgress("Downloading " + info.Tag + "…", pct, readTotal, totalBytes));
+                    await local.WriteAsync(buffer.AsMemory(0, read), token);
+                    readTotal += read;
+
+                    double? pct = totalBytes is > 0
+                        ? Math.Clamp(readTotal * 100.0 / totalBytes.Value, 0, 100)
+                        : null;
+                    int wholePct = pct.HasValue ? (int)Math.Floor(pct.Value) : -1;
+                    long now = Environment.TickCount64;
+                    if (now - lastReportAt >= 50 || wholePct != lastPercent)
+                    {
+                        lastReportAt = now;
+                        lastPercent = wholePct;
+                        progress?.Report(new DownloadProgress("Downloading " + info.Tag + "…", pct, readTotal, totalBytes));
+                    }
                 }
+
+                await local.FlushAsync(token);
+                progress?.Report(new DownloadProgress("Downloading " + info.Tag + "…", 100, readTotal, totalBytes ?? readTotal));
             }
 
-            progress?.Report(new DownloadProgress("Downloading " + info.Tag + "…", 100, readTotal, totalBytes ?? readTotal));
+            // Atomic commit from .part to final versioned zip
+            File.Move(partPath, zipPath, overwrite: true);
+        }
+        catch
+        {
+            try { if (File.Exists(partPath)) File.Delete(partPath); } catch { /* best-effort cleanup */ }
+            throw;
         }
 
         progress?.Report(new DownloadProgress("Unpacking update…", null, 0, null));
@@ -150,6 +167,39 @@ internal static class ReleaseClient
         return exePath;
     }
 
+    public static void CleanupTempDownloads()
+    {
+        try
+        {
+            if (!Directory.Exists(TempRoot))
+                return;
+            string currentProcess = Environment.ProcessPath ?? "";
+            foreach (var entry in Directory.EnumerateFileSystemEntries(TempRoot))
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(currentProcess)
+                        && currentProcess.StartsWith(entry, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (Directory.Exists(entry))
+                        Directory.Delete(entry, recursive: true);
+                    else if (File.Exists(entry))
+                        File.Delete(entry);
+                }
+                catch
+                {
+                    // Skip locked temp files.
+                }
+            }
+            if (!Directory.EnumerateFileSystemEntries(TempRoot).Any())
+                Directory.Delete(TempRoot, recursive: false);
+        }
+        catch
+        {
+            // Temp cleanup is best-effort.
+        }
+    }
+
     public static string FormatBytes(long bytes)
     {
         if (bytes < 1024)
@@ -158,31 +208,64 @@ internal static class ReleaseClient
             return $"{bytes / 1024.0:0.0} KB";
         return $"{bytes / (1024.0 * 1024.0):0.1} MB";
     }
+
+    private static string SanitizeTag(string tag)
+    {
+        var chars = tag.Trim().Select(c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_' ? c : '_').ToArray();
+        return chars.Length == 0 ? "latest" : new string(chars);
+    }
 }
 
 internal static class UpdateCheck
 {
+    private static readonly TimeSpan Interval = TimeSpan.FromHours(6);
+    private static CancellationTokenSource? _loopCts;
+    private static string? _offeredTag;
+
     public static ReleaseInfo? Available { get; private set; }
     public static event Action<ReleaseInfo>? UpdateAvailable;
 
     public static void Queue()
     {
+        if (_loopCts != null)
+            return;
+        _loopCts = new CancellationTokenSource();
+        var token = _loopCts.Token;
+
         _ = Task.Run(async () =>
         {
             try
             {
-                var info = await ReleaseClient.LatestAsync();
-                if (info == null || !ReleaseClient.IsNewer(info.Version))
-                    return;
-                NotifyAvailable(info);
-                var app = System.Windows.Application.Current;
-                app?.Dispatcher.BeginInvoke(() => UpdateWindow.Offer(info));
+                await Task.Delay(TimeSpan.FromSeconds(3), token);
+                await RunBackgroundCheck(token);
+
+                using var timer = new PeriodicTimer(Interval);
+                while (await timer.WaitForNextTickAsync(token))
+                    await RunBackgroundCheck(token);
+            }
+            catch (OperationCanceledException)
+            {
+                // App shutting down.
             }
             catch
             {
-                // No release, or the network is blocked. The installed version keeps running.
+                // Background checks must never crash the app.
             }
-        });
+        }, token);
+    }
+
+    public static void Stop()
+    {
+        try
+        {
+            _loopCts?.Cancel();
+            _loopCts?.Dispose();
+        }
+        catch
+        {
+            // Already cancelled.
+        }
+        _loopCts = null;
     }
 
     public static async Task<ReleaseInfo?> CheckAsync(CancellationToken token = default)
@@ -191,6 +274,28 @@ internal static class UpdateCheck
         if (info != null && ReleaseClient.IsNewer(info.Version))
             NotifyAvailable(info);
         return info;
+    }
+
+    private static async Task RunBackgroundCheck(CancellationToken token)
+    {
+        try
+        {
+            var info = await ReleaseClient.LatestAsync(token);
+            if (info == null || !ReleaseClient.IsNewer(info.Version))
+                return;
+            NotifyAvailable(info);
+
+            if (!string.Equals(_offeredTag, info.Tag, StringComparison.OrdinalIgnoreCase))
+            {
+                _offeredTag = info.Tag;
+                var app = System.Windows.Application.Current;
+                app?.Dispatcher.BeginInvoke(() => UpdateWindow.Offer(info));
+            }
+        }
+        catch
+        {
+            // No release, or offline. Keep running silently.
+        }
     }
 
     private static void NotifyAvailable(ReleaseInfo info)

@@ -67,7 +67,8 @@ internal static class Installer
             return;
         }
 
-        Process.Start(new ProcessStartInfo(ExePath, "--first-run") { UseShellExecute = true });
+        string launchArg = updating ? "--updated" : "--first-run";
+        Process.Start(new ProcessStartInfo(ExePath, launchArg) { UseShellExecute = true });
     }
 
     public static void Uninstall()

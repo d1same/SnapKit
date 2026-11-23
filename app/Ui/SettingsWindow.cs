@@ -39,7 +39,7 @@ internal sealed class SettingsWindow : Window
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
         });
-        var versionPill = UiChrome.Pill("v" + ReleaseClient.Display, Palette.AccentSoft, Palette.Text, Palette.AccentLine, mono: true);
+        var versionPill = UiChrome.Pill("v" + ReleaseClient.Display, Palette.Elevated, Palette.Text, Palette.Line, mono: true);
         versionPill.Margin = new Thickness(10, 2, 0, 0);
         header.Children.Add(versionPill);
         stack.Children.Add(header);
@@ -160,7 +160,7 @@ internal sealed class SettingsWindow : Window
             Text = UpdateCheck.Available is { } available
                 ? $"Update {available.Tag} is available."
                 : $"Running {Brand.Name} v{ReleaseClient.Display} from {ReleaseClient.Owner}/{ReleaseClient.Repo}.",
-            Foreground = UpdateCheck.Available != null ? Palette.Accent : Palette.Muted,
+            Foreground = UpdateCheck.Available != null ? Palette.Text : Palette.Muted,
             FontFamily = Palette.Font,
             FontSize = 12.5,
             TextWrapping = TextWrapping.Wrap,
@@ -183,7 +183,7 @@ internal sealed class SettingsWindow : Window
             _updateStatus.Text = "Checking GitHub for the latest release…";
             string message = await UpdateWindow.CheckNow(this);
             _updateStatus.Text = message;
-            _updateStatus.Foreground = UpdateCheck.Available != null ? Palette.Accent : Palette.Muted;
+            _updateStatus.Foreground = UpdateCheck.Available != null ? Palette.Text : Palette.Muted;
             check.Content = UpdateCheck.Available != null ? "View update" : "Check for updates";
             check.IsEnabled = true;
         };
@@ -306,7 +306,8 @@ internal sealed class SettingsWindow : Window
         StopListening();
         _listening = action;
         button.Content = "Press keys…";
-        button.Background = Palette.Accent;
+        button.Background = Palette.ActiveSurface;
+        button.Foreground = Palette.Ink;
         _state.Hotkeys.Unregister();
         _hook = new KeyChordListener();
         _hook.Captured += gesture => Dispatcher.Invoke(() => ApplyGesture(action, gesture, button));
@@ -318,6 +319,7 @@ internal sealed class SettingsWindow : Window
         StopListening();
         button.Content = "Change";
         button.Background = Palette.Elevated;
+        button.Foreground = Palette.Text;
         var conflict = _state.Settings.Gestures()
             .FirstOrDefault(pair => pair.Action != action && !gesture.IsEmpty && pair.Gesture.EqualsGesture(gesture));
         if (conflict.Gesture != null)
@@ -336,7 +338,7 @@ internal sealed class SettingsWindow : Window
             _note.Text = "Couldn't register " + string.Join(", ", failed) + ". Another app may already own that key.";
             return;
         }
-        _note.Foreground = Palette.Success;
+        _note.Foreground = Palette.Text;
         _note.Text = "Shortcut saved.";
     }
 

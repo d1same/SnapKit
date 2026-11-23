@@ -27,13 +27,25 @@ internal static class WindowChrome
     public static void UseDarkTitle(Window window)
     {
         var hwnd = new WindowInteropHelper(window).Handle;
+        UseDarkPopup(hwnd);
+    }
+
+    public static void UseDarkPopup(IntPtr hwnd)
+    {
         if (hwnd == IntPtr.Zero)
             return;
-        int enabled = 1;
-        NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
-        NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaUseImmersiveDarkModeOld, ref enabled, sizeof(int));
-        int rounded = 2;
-        NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaWindowCornerPreference, ref rounded, sizeof(int));
+        try
+        {
+            int enabled = 1;
+            NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
+            NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaUseImmersiveDarkModeOld, ref enabled, sizeof(int));
+            int rounded = 2; // DWMWCP_ROUND
+            NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DwmwaWindowCornerPreference, ref rounded, sizeof(int));
+        }
+        catch
+        {
+            // Older Windows builds may ignore DWM corner preference.
+        }
     }
 
     public static void StripFrame(IntPtr hwnd, bool inTaskbar = false)

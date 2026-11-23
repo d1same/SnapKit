@@ -33,7 +33,7 @@ internal sealed class InstallWindow : Window
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
         });
-        var pill = UiChrome.Pill("v" + ReleaseClient.Display, Palette.AccentSoft, Palette.Text, Palette.AccentLine, mono: true);
+        var pill = UiChrome.Pill("v" + ReleaseClient.Display, Palette.Elevated, Palette.Text, Palette.Line, mono: true);
         pill.Margin = new Thickness(10, 2, 0, 0);
         header.Children.Add(pill);
 

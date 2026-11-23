@@ -3,14 +3,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-        <!-- Global dark tooltip -->
+        <!-- Global dark rounded tooltip -->
         <Style TargetType="{x:Type ToolTip}">
-            <Setter Property="Background" Value="#1A1C22" />
-            <Setter Property="Foreground" Value="#F4F4F6" />
-            <Setter Property="BorderBrush" Value="#363B48" />
+            <Setter Property="Background" Value="#222222" />
+            <Setter Property="Foreground" Value="#F2F2F2" />
+            <Setter Property="BorderBrush" Value="#2E2E2E" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontFamily" Value="Segoe UI" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11.5" />
             <Setter Property="Padding" Value="9,5" />
             <Setter Property="HasDropShadow" Value="False" />
             <Setter Property="Placement" Value="Top" />
@@ -34,6 +34,48 @@
             </Setter>
         </Style>
 
+        <!-- Custom dark button template (eliminates WPF Aero blue hover flicker) -->
+        <Style TargetType="{x:Type Button}">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Background" Value="#2A2A2A" />
+            <Setter Property="Foreground" Value="#F2F2F2" />
+            <Setter Property="BorderBrush" Value="#2E2E2E" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Neutral dark TextBox (eliminates Aero blue focus border) -->
+        <Style TargetType="{x:Type TextBox}">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="SelectionBrush" Value="#4A4A4A" />
+            <Setter Property="SelectionTextBrush" Value="#F2F2F2" />
+            <Setter Property="CaretBrush" Value="#F2F2F2" />
+        </Style>
+
         <!-- Minimal dark scrollbar thumb -->
         <Style x:Key="SnapKitScrollThumb" TargetType="{x:Type Thumb}">
             <Setter Property="OverridesDefaultStyle" Value="True" />
@@ -42,15 +84,15 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Thumb}">
                         <Border x:Name="Pill"
-                                Background="#3E4452"
+                                Background="#383838"
                                 CornerRadius="4"
                                 Margin="1" />
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Pill" Property="Background" Value="#586074" />
+                                <Setter TargetName="Pill" Property="Background" Value="#525252" />
                             </Trigger>
                             <Trigger Property="IsDragging" Value="True">
-                                <Setter TargetName="Pill" Property="Background" Value="#737D96" />
+                                <Setter TargetName="Pill" Property="Background" Value="#6E6E6E" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -75,8 +117,8 @@
         <Style TargetType="{x:Type ScrollBar}">
             <Setter Property="OverridesDefaultStyle" Value="True" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Width" Value="9" />
-            <Setter Property="MinWidth" Value="9" />
+            <Setter Property="Width" Value="8" />
+            <Setter Property="MinWidth" Value="8" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ScrollBar}">
@@ -100,8 +142,8 @@
                 <Trigger Property="Orientation" Value="Horizontal">
                     <Setter Property="Width" Value="Auto" />
                     <Setter Property="MinWidth" Value="0" />
-                    <Setter Property="Height" Value="9" />
-                    <Setter Property="MinHeight" Value="9" />
+                    <Setter Property="Height" Value="8" />
+                    <Setter Property="MinHeight" Value="8" />
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="{x:Type ScrollBar}">

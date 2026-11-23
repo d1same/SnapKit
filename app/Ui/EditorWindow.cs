@@ -22,7 +22,7 @@ internal sealed class EditorWindow : Window
         Title = Brand.Name;
         Width = 1140;
         Height = 780;
-        MinWidth = 740;
+        MinWidth = 760;
         MinHeight = 500;
         Background = Palette.Bg;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -42,7 +42,10 @@ internal sealed class EditorWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             SnapsToDevicePixels = true
         };
-        _toolbar = new ToolbarView(showFit: true);
+        _toolbar = new ToolbarView(showFit: true)
+        {
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
         _scroller = new ScrollViewer
         {
             Background = Palette.Bg,
@@ -117,7 +120,8 @@ internal sealed class EditorWindow : Window
         {
             _session.SetColor(hex);
             _surface.ColorHex = _session.ColorHex;
-            _surface.RestyleSelection(_session.ColorHex, null, null);
+            _surface.RedactColorHex = _session.RedactColorHex;
+            _surface.RestyleSelection(_session.ActiveColorHex, null, null);
         };
         _toolbar.StrokePicked += size =>
         {
@@ -125,11 +129,11 @@ internal sealed class EditorWindow : Window
             _surface.StrokeWidth = _session.Stroke;
             _surface.RestyleSelection(null, _session.Stroke, null);
         };
-        _toolbar.FontPicked += size =>
+        _toolbar.FontStepped += delta =>
         {
-            _session.SetFontSize(size);
-            _surface.FontSize = size;
-            _surface.RestyleSelection(null, null, size);
+            _session.StepFontSize(delta);
+            _surface.FontSize = _session.FontSize;
+            _surface.RestyleSelection(null, null, _session.FontSize);
         };
         _toolbar.FillModePicked += mode =>
         {
@@ -140,7 +144,7 @@ internal sealed class EditorWindow : Window
         _toolbar.BackdropPicked += preset => _session.SetBackdrop(preset);
         _surface.ColorPicked += hex =>
         {
-            _session.SetColor(hex);
+            _session.PickColorFromPixel(hex);
             _surface.ColorHex = _session.ColorHex;
         };
         _surface.SelectionChanged += mark => _session.SetSelectedKind(mark?.Kind);
@@ -152,7 +156,7 @@ internal sealed class EditorWindow : Window
             _session.ClearAll();
         };
         _toolbar.ResetStepClicked += () => _session.ResetStep();
-        ShotMenu.Attach(_surface, _surface, _session, this);
+        ShotMenu.Attach(_surface, _surface, _session, this, RunOcr, Pin, Discard);
         _toolbar.CopyClicked += () =>
         {
             _surface.CommitEditing();
@@ -163,26 +167,26 @@ internal sealed class EditorWindow : Window
             _surface.CommitEditing();
             _session.Save(this);
         };
-        _toolbar.QuickSaveClicked += () =>
-        {
-            _surface.CommitEditing();
-            _session.QuickSave();
-        };
-        _toolbar.OcrClicked += () =>
-        {
-            _surface.CommitEditing();
-            OcrFlow.Start(_session.Document.ComposeUnderlay(), _session.Flash, this, () => _session.State.Settings.CloseOnClickAway);
-        };
+        _toolbar.OcrClicked += RunOcr;
         _toolbar.PinClicked += Pin;
         _toolbar.CloseClicked += Discard;
         _toolbar.FitClicked += Fit;
+        _toolbar.ZoomInClicked += () => StepZoom(1.15);
+        _toolbar.ZoomOutClicked += () => StepZoom(1.0 / 1.15);
         _session.Document.Changed += () => Dispatcher.BeginInvoke(Apply);
+    }
+
+    private void RunOcr()
+    {
+        _surface.CommitEditing();
+        OcrFlow.Start(_session.Document.ComposeUnderlay(), message => _session.Flash(message), this, () => _session.State.Settings.CloseOnClickAway);
     }
 
     private void Apply()
     {
         _surface.Tool = _session.Tool;
         _surface.ColorHex = _session.ColorHex;
+        _surface.RedactColorHex = _session.RedactColorHex;
         _surface.StrokeWidth = _session.Stroke;
         _surface.FontSize = _session.FontSize;
         _surface.FillMode = _session.FillMode;
@@ -241,7 +245,7 @@ internal sealed class EditorWindow : Window
         if (availW < 140 || availH < 140)
         {
             availW = Math.Max(availW, ActualWidth - 64);
-            availH = Math.Max(availH, ActualHeight - 210);
+            availH = Math.Max(availH, ActualHeight - 160);
         }
         var metrics = BackdropLayout.Measure(_session.Document.Backdrop, _session.Document.View.Width, _session.Document.View.Height);
         double fit = Math.Min(availW / metrics.TotalWidth, availH / metrics.TotalHeight);

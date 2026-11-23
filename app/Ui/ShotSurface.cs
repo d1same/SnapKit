@@ -53,6 +53,7 @@ internal sealed class ShotSurface : Grid
     public double PixelScale { get; private set; }
     public EditorTool Tool { get; set; } = EditorTool.Arrow;
     public string ColorHex { get; set; } = "#FF3B30";
+    public string RedactColorHex { get; set; } = "#151515";
     public double StrokeWidth { get; set; } = 3;
     public double FontSize { get; set; } = 18;
     public ShapeFillMode FillMode { get; set; } = ShapeFillMode.Outline;
@@ -185,7 +186,7 @@ internal sealed class ShotSurface : Grid
         if (_draft != null)
         {
             if (_draft.Kind == AnnotationKind.Blur || _cropping)
-                DrawDraftBox(dc, _draft, _cropping ? Palette.Accent : Brushes.White);
+                DrawDraftBox(dc, _draft);
             else
                 AnnotationPainter.Draw(dc, _draft, _editing != null && _draft.Id == _editing.Id);
         }
@@ -196,15 +197,15 @@ internal sealed class ShotSurface : Grid
         dc.Pop();
     }
 
-    private void DrawDraftBox(DrawingContext dc, Annotation draft, Brush stroke)
+    private void DrawDraftBox(DrawingContext dc, Annotation draft)
     {
         var rect = AnnotationPainter.Box(draft);
         double thickness = Math.Max(1, 1.5 * PixelScale);
         var halo = new Pen(Palette.Freeze(0, 0, 0, 0xB0), thickness + 1 * PixelScale);
         halo.Freeze();
-        var pen = new Pen(stroke, thickness) { DashStyle = new DashStyle(new[] { 4d, 3d }, 0) };
+        var pen = new Pen(Palette.Text, thickness) { DashStyle = new DashStyle(new[] { 4d, 3d }, 0) };
         pen.Freeze();
-        dc.DrawRectangle(Palette.Freeze(10, 132, 255, 0x16), halo, rect);
+        dc.DrawRectangle(Palette.Freeze(242, 242, 242, 0x14), halo, rect);
         dc.DrawRectangle(null, pen, rect);
     }
 
@@ -223,9 +224,9 @@ internal sealed class ShotSurface : Grid
                 double r = Math.Max(12, annotation.FontSize * 0.72) + 3;
                 rect = new Rect(annotation.Points[0].X - r, annotation.Points[0].Y - r, r * 2, r * 2);
             }
-            var halo = new Pen(Palette.Freeze(0, 0, 0, 0x99), 2.2 * scale);
+            var halo = new Pen(Palette.Freeze(0, 0, 0, 0xB8), 2.2 * scale);
             halo.Freeze();
-            var dash = new Pen(Palette.Accent, 1.25 * scale) { DashStyle = new DashStyle(new[] { 4d, 3d }, 0) };
+            var dash = new Pen(Palette.Text, 1.2 * scale) { DashStyle = new DashStyle(new[] { 4d, 3d }, 0) };
             dash.Freeze();
             dc.DrawRectangle(null, halo, rect);
             dc.DrawRectangle(null, dash, rect);
@@ -236,15 +237,15 @@ internal sealed class ShotSurface : Grid
             return;
 
         double radius = 4.6 * scale;
-        var ring = new Pen(Palette.Accent, 1.8 * scale);
+        var ring = new Pen(Palette.Ink, 1.7 * scale);
         ring.Freeze();
-        var outer = new Pen(Palette.Freeze(0, 0, 0, 0x80), 3.0 * scale);
+        var outer = new Pen(Palette.Freeze(255, 255, 255, 0x44), 3.0 * scale);
         outer.Freeze();
         foreach (var handle in handles)
         {
             var pt = new Point(handle.Position.X, handle.Position.Y);
             dc.DrawEllipse(null, outer, pt, radius, radius);
-            dc.DrawEllipse(Brushes.White, ring, pt, radius, radius);
+            dc.DrawEllipse(Palette.Text, ring, pt, radius, radius);
         }
     }
 
@@ -592,7 +593,7 @@ internal sealed class ShotSurface : Grid
             EditorTool.Crop => AnnotationKind.Rectangle,
             _ => AnnotationKind.Pen
         },
-        ColorHex = ColorHex,
+        ColorHex = Tool == EditorTool.Redact ? RedactColorHex : ColorHex,
         Stroke = StrokeWidth,
         FontSize = FontSize,
         FillMode = FillMode
