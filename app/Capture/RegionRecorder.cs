@@ -6,6 +6,8 @@ namespace SnapKit;
 /// <summary>
 /// Records a screen region to H.264 MP4 (with optional WASAPI mic + system audio)
 /// or animated GIF89a, with live pause/resume and optional cursor + click highlight rings.
+/// All Media Foundation & WASAPI COM objects are created, used, and finalized strictly
+/// on MTA background threads (never on WPF's STA UI thread) to avoid cross-apartment COM failures.
 /// </summary>
 internal sealed class RegionRecorder : IScreenRecorder
 {
@@ -20,6 +22,7 @@ internal sealed class RegionRecorder : IScreenRecorder
     private RecordingOptions? _options;
     private string _outputPath = "";
     private string? _warning;
+    private Exception? _fatalError;
     private volatile bool _paused;
     private long _elapsedMs;
     private int _frames;
@@ -52,6 +55,7 @@ internal sealed class RegionRecorder : IScreenRecorder
         _paused = false;
         _stopped = false;
         _warning = null;
+        _fatalError = null;
         Volatile.Write(ref _elapsedMs, 0);
         Volatile.Write(ref _frames, 0);
         _clicks.Clear();
@@ -62,26 +66,44 @@ internal sealed class RegionRecorder : IScreenRecorder
 
         if (_options.Format == RecordingFormat.Mp4)
         {
-            var audioNotes = new List<string>();
-            if (_options.RecordMic)
+            // Initialize Media Foundation & WASAPI strictly on an MTA thread (Task.Run),
+            // matching the MTA apartment of VideoLoop, AudioLoop, and StopAsync finalization.
+            Task.Run(() =>
             {
-                _mic = WasapiCapture.TryCreate(loopback: false, out var micErr);
-                if (_mic == null && !string.IsNullOrWhiteSpace(micErr))
-                    audioNotes.Add(micErr);
-            }
-            if (_options.RecordSystemAudio)
-            {
-                _loopback = WasapiCapture.TryCreate(loopback: true, out var sysErr);
-                if (_loopback == null && !string.IsNullOrWhiteSpace(sysErr))
-                    audioNotes.Add(sysErr);
-            }
-            if (audioNotes.Count > 0)
-                _warning = string.Join(" ", audioNotes);
+                var audioNotes = new List<string>();
+                if (_options.RecordMic)
+                {
+                    _mic = WasapiCapture.TryCreate(loopback: false, out var micErr);
+                    if (_mic == null && !string.IsNullOrWhiteSpace(micErr))
+                        audioNotes.Add(micErr);
+                }
+                if (_options.RecordSystemAudio)
+                {
+                    _loopback = WasapiCapture.TryCreate(loopback: true, out var sysErr);
+                    if (_loopback == null && !string.IsNullOrWhiteSpace(sysErr))
+                        audioNotes.Add(sysErr);
+                }
 
-            bool hasAudio = _mic != null || _loopback != null;
-            _mp4 = new Mp4SinkWriter(outputPath, width, height, fps, enableAudio: hasAudio);
-            _mic?.Start();
-            _loopback?.Start();
+                bool wantAudio = _mic != null || _loopback != null;
+                _mp4 = new Mp4SinkWriter(outputPath, width, height, fps, enableAudio: wantAudio);
+                if (!_mp4.HasAudio)
+                {
+                    _mic?.Dispose();
+                    _mic = null;
+                    _loopback?.Dispose();
+                    _loopback = null;
+                    if (!string.IsNullOrWhiteSpace(_mp4.AudioFallbackNote))
+                        audioNotes.Add(_mp4.AudioFallbackNote);
+                }
+                else
+                {
+                    _mic?.Start();
+                    _loopback?.Start();
+                }
+
+                if (audioNotes.Count > 0)
+                    _warning = string.Join(" ", audioNotes);
+            }).GetAwaiter().GetResult();
         }
         else
         {
@@ -92,7 +114,7 @@ internal sealed class RegionRecorder : IScreenRecorder
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
         _videoTask = Task.Run(() => VideoLoop(token), token);
-        if (_mp4 != null && (_mic != null || _loopback != null))
+        if (_mp4 is { HasAudio: true } && (_mic != null || _loopback != null))
             _audioTask = Task.Run(() => AudioLoop(token), token);
     }
 
@@ -119,7 +141,7 @@ internal sealed class RegionRecorder : IScreenRecorder
 
         if (_videoTask != null)
         {
-            try { await _videoTask; } catch { /* cancelled */ }
+            try { await _videoTask; } catch { /* handled via _fatalError */ }
             _videoTask = null;
         }
         if (_audioTask != null)
@@ -128,6 +150,7 @@ internal sealed class RegionRecorder : IScreenRecorder
             _audioTask = null;
         }
 
+        Exception? finalizeError = null;
         await Task.Run(() =>
         {
             _mic?.Dispose();
@@ -135,19 +158,55 @@ internal sealed class RegionRecorder : IScreenRecorder
             _loopback?.Dispose();
             _loopback = null;
 
-            _mp4?.Finish();
-            _mp4?.Dispose();
-            _mp4 = null;
+            if (_mp4 != null)
+            {
+                try
+                {
+                    _mp4.Finish();
+                }
+                catch (Exception ex)
+                {
+                    finalizeError = ex;
+                }
+                finally
+                {
+                    _mp4.Dispose();
+                    _mp4 = null;
+                }
+            }
 
-            _gif?.Finish();
-            _gif?.Dispose();
-            _gif = null;
+            if (_gif != null)
+            {
+                try
+                {
+                    _gif.Finish();
+                }
+                catch (Exception ex)
+                {
+                    finalizeError ??= ex;
+                }
+                finally
+                {
+                    _gif.Dispose();
+                    _gif = null;
+                }
+            }
         });
 
         _cts?.Dispose();
         _cts = null;
 
+        var error = _fatalError ?? finalizeError;
+        if (error != null)
+            throw error;
+
+        if (FramesCaptured == 0)
+            throw new InvalidOperationException("No frames were captured before recording stopped.");
+
         long bytes = File.Exists(_outputPath) ? new FileInfo(_outputPath).Length : 0;
+        if (bytes < 64)
+            throw new InvalidOperationException("The recording file could not be finalized.");
+
         return new RecordingResult(
             _outputPath,
             _options?.Format ?? RecordingFormat.Mp4,
@@ -169,99 +228,123 @@ internal sealed class RegionRecorder : IScreenRecorder
 
     private void VideoLoop(CancellationToken token)
     {
-        var opts = _options!;
-        double frameMs = 1000.0 / opts.Fps;
-        long frameDuration100Ns = (long)Math.Round(10_000_000.0 / opts.Fps);
-        var clock = Stopwatch.StartNew();
-        long pausedTotalMs = 0;
-        long pauseStartMs = -1;
-        long nextTickMs = 0;
-        long lastFrameTimeMs = -1;
-
-        while (!token.IsCancellationRequested)
+        try
         {
-            long nowMs = clock.ElapsedMilliseconds;
-            if (_paused)
+            var opts = _options!;
+            double frameMs = 1000.0 / opts.Fps;
+            long frameDuration100Ns = (long)Math.Round(10_000_000.0 / opts.Fps);
+            var clock = Stopwatch.StartNew();
+            long pausedTotalMs = 0;
+            long pauseStartMs = -1;
+            long nextTickMs = 0;
+            long lastFrameTimeMs = -1;
+
+            while (!token.IsCancellationRequested)
             {
-                if (pauseStartMs < 0)
-                    pauseStartMs = nowMs;
-                Thread.Sleep(25);
-                continue;
+                long nowMs = clock.ElapsedMilliseconds;
+                if (_paused)
+                {
+                    if (pauseStartMs < 0)
+                        pauseStartMs = nowMs;
+                    Thread.Sleep(25);
+                    continue;
+                }
+                if (pauseStartMs >= 0)
+                {
+                    pausedTotalMs += nowMs - pauseStartMs;
+                    pauseStartMs = -1;
+                    nextTickMs = nowMs - pausedTotalMs;
+                }
+
+                long activeMs = Math.Max(0, nowMs - pausedTotalMs);
+                if (activeMs < nextTickMs)
+                {
+                    int sleep = (int)Math.Min(15, nextTickMs - activeMs);
+                    if (sleep > 0)
+                        Thread.Sleep(sleep);
+                    continue;
+                }
+
+                var frame = ScreenGrabber.CaptureRect(opts.ScreenX, opts.ScreenY, opts.Width, opts.Height);
+                if (opts.ShowCursor)
+                    CompositeCursorAndClicks(frame, opts, activeMs);
+
+                long deltaMs = lastFrameTimeMs < 0 ? (long)Math.Round(frameMs) : Math.Max(10, activeMs - lastFrameTimeMs);
+                lastFrameTimeMs = activeMs;
+
+                if (_mp4 != null)
+                {
+                    long ts100Ns = activeMs * 10_000L;
+                    _mp4.WriteVideoFrame(frame, ts100Ns, Math.Max(frameDuration100Ns, deltaMs * 10_000L));
+                }
+                else if (_gif != null)
+                {
+                    _gif.AddFrame(frame, (int)Math.Clamp(deltaMs, 20, 5000));
+                }
+
+                Volatile.Write(ref _elapsedMs, activeMs);
+                Interlocked.Increment(ref _frames);
+
+                nextTickMs = activeMs + (long)Math.Round(frameMs);
             }
-            if (pauseStartMs >= 0)
-            {
-                pausedTotalMs += nowMs - pauseStartMs;
-                pauseStartMs = -1;
-                nextTickMs = nowMs - pausedTotalMs;
-            }
-
-            long activeMs = Math.Max(0, nowMs - pausedTotalMs);
-            if (activeMs < nextTickMs)
-            {
-                int sleep = (int)Math.Min(15, nextTickMs - activeMs);
-                if (sleep > 0)
-                    Thread.Sleep(sleep);
-                continue;
-            }
-
-            var frame = ScreenGrabber.CaptureRect(opts.ScreenX, opts.ScreenY, opts.Width, opts.Height);
-            if (opts.ShowCursor)
-                CompositeCursorAndClicks(frame, opts, activeMs);
-
-            long deltaMs = lastFrameTimeMs < 0 ? (long)Math.Round(frameMs) : Math.Max(10, activeMs - lastFrameTimeMs);
-            lastFrameTimeMs = activeMs;
-
-            if (_mp4 != null)
-            {
-                long ts100Ns = activeMs * 10_000L;
-                _mp4.WriteVideoFrame(frame, ts100Ns, Math.Max(frameDuration100Ns, deltaMs * 10_000L));
-            }
-            else if (_gif != null)
-            {
-                _gif.AddFrame(frame, (int)Math.Clamp(deltaMs, 20, 5000));
-            }
-
-            Volatile.Write(ref _elapsedMs, activeMs);
-            Interlocked.Increment(ref _frames);
-
-            nextTickMs = activeMs + (long)Math.Round(frameMs);
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal stop.
+        }
+        catch (Exception ex)
+        {
+            _fatalError = ex;
         }
     }
 
     private void AudioLoop(CancellationToken token)
     {
-        const int sliceMs = 20;
-        int chunkBytes = AudioMixer.BytesForMilliseconds(sliceMs);
-        long slice100Ns = sliceMs * 10_000L;
-        long audioTimestamp100Ns = 0;
-        var clock = Stopwatch.StartNew();
-        long nextTickMs = sliceMs;
-
-        while (!token.IsCancellationRequested)
+        try
         {
-            if (_paused)
+            const int sliceMs = 20;
+            int chunkBytes = AudioMixer.BytesForMilliseconds(sliceMs);
+            long slice100Ns = sliceMs * 10_000L;
+            long audioTimestamp100Ns = 0;
+            var clock = Stopwatch.StartNew();
+            long nextTickMs = sliceMs;
+
+            while (!token.IsCancellationRequested)
             {
-                _mic?.DiscardPending();
-                _loopback?.DiscardPending();
-                Thread.Sleep(25);
-                nextTickMs = clock.ElapsedMilliseconds + sliceMs;
-                continue;
+                if (_paused)
+                {
+                    _mic?.DiscardPending();
+                    _loopback?.DiscardPending();
+                    Thread.Sleep(25);
+                    nextTickMs = clock.ElapsedMilliseconds + sliceMs;
+                    continue;
+                }
+
+                long now = clock.ElapsedMilliseconds;
+                if (now < nextTickMs)
+                {
+                    Thread.Sleep((int)Math.Min(10, nextTickMs - now));
+                    continue;
+                }
+
+                var micData = _mic?.ReadChunk(chunkBytes) ?? Array.Empty<byte>();
+                var sysData = _loopback?.ReadChunk(chunkBytes) ?? Array.Empty<byte>();
+                var mixed = AudioMixer.MixPcm16(sysData, micData, chunkBytes);
+                _mp4?.WriteAudioPcm(mixed, audioTimestamp100Ns, slice100Ns);
+
+                audioTimestamp100Ns += slice100Ns;
+                nextTickMs += sliceMs;
             }
-
-            long now = clock.ElapsedMilliseconds;
-            if (now < nextTickMs)
-            {
-                Thread.Sleep((int)Math.Min(10, nextTickMs - now));
-                continue;
-            }
-
-            var micData = _mic?.ReadChunk(chunkBytes) ?? Array.Empty<byte>();
-            var sysData = _loopback?.ReadChunk(chunkBytes) ?? Array.Empty<byte>();
-            var mixed = AudioMixer.MixPcm16(sysData, micData, chunkBytes);
-            _mp4?.WriteAudioPcm(mixed, audioTimestamp100Ns, slice100Ns);
-
-            audioTimestamp100Ns += slice100Ns;
-            nextTickMs += sliceMs;
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal stop.
+        }
+        catch (Exception ex)
+        {
+            _warning = string.IsNullOrWhiteSpace(_warning)
+                ? "Audio stopped early: " + ex.Message
+                : _warning;
         }
     }
 
@@ -287,7 +370,6 @@ internal sealed class RegionRecorder : IScreenRecorder
         _prevLeftDown = leftDown;
         _prevRightDown = rightDown;
 
-        // Prune expired click pulses and draw active ones
         long maxAgeMs = (long)(RecordingOverlay.PulseDurationSeconds * 1000);
         _clicks.RemoveAll(c => activeMs - c.AtMs > maxAgeMs);
         if (_clicks.Count > 0)

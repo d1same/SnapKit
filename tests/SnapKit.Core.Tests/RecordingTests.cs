@@ -112,4 +112,27 @@ public class RecordingTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void Nv12_converter_produces_valid_studio_range_y_and_uv_planes()
+    {
+        var frame = new PixelBuffer(8, 6);
+        frame.FillRect(0, 0, 8, 2, 0, 0, 0);         // black -> Y=16, U=128, V=128
+        frame.FillRect(0, 2, 8, 2, 255, 255, 255);   // white -> Y=235, U=128, V=128
+        frame.FillRect(0, 4, 8, 2, 0, 0, 255);       // pure red -> high V, low U
+
+        byte[] nv12 = Nv12Convert.FromBgra(frame, 8, 6);
+        Assert.Equal(8 * 6 + (8 * 6) / 2, nv12.Length);
+
+        // Top row (black)
+        Assert.Equal(16, nv12[0]);
+        // Middle row (white)
+        Assert.Equal(235, nv12[2 * 8]);
+        // UV plane starts at 48: black row UV = (128, 128)
+        Assert.Equal(128, nv12[48]);
+        Assert.Equal(128, nv12[49]);
+        // Red row UV (row 2 of UV plane = 48 + 16 = 64): V > 200, U < 110
+        Assert.True(nv12[64] < 110);
+        Assert.True(nv12[65] > 200);
+    }
 }
