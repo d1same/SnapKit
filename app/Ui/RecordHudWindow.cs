@@ -99,6 +99,11 @@ internal sealed class RecordHudWindow : Window
             AutoFade = true
         };
         _drawOverlay.ExitDrawRequested += () => SetLiveDraw(false);
+        _drawOverlay.BlurRegionsChanged += (pixelRects, dipRects) =>
+        {
+            _recorder?.SetLiveBlurRegions(pixelRects);
+            _frameWindow.SetBlurGuides(dipRects);
+        };
 
         // ── Ready row (before recording starts) ────────────────────────────────
         _readyRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -270,7 +275,9 @@ internal sealed class RecordHudWindow : Window
             (AnnotationKind.Rectangle, "□", "Box"),
             (AnnotationKind.Ellipse, "○", "Circle"),
             (AnnotationKind.Highlighter, "▬", "Highlighter"),
-            (AnnotationKind.Number, "①", "Step #")
+            (AnnotationKind.Number, "①", "Step #"),
+            (AnnotationKind.Blur, "▦", "Live Blur (pixelates pixels directly into the video; never auto-fades)"),
+            (AnnotationKind.Redact, "■", "Solid Blackout Redact (never auto-fades)")
         };
         foreach (var (kind, glyph, tip) in liveTools)
         {
@@ -503,6 +510,7 @@ internal sealed class RecordHudWindow : Window
                 _format == RecordingFormat.Mp4 && _recordSystem);
 
             _recorder = new RegionRecorder();
+            _recorder.SetLiveBlurRegions(_drawOverlay.GetBlurPixelRects());
             _recorder.Start(options, outPath);
 
             _readyRow.Visibility = Visibility.Collapsed;
@@ -724,7 +732,9 @@ internal sealed class RecordHudWindow : Window
 
     private sealed class RecordFrameWindow : Window
     {
+        private const int FramePad = 3;
         private readonly Rectangle _dash;
+        private readonly Canvas _blurGuides;
         private readonly MonitorInfo _monitor;
         private readonly int _x;
         private readonly int _y;
@@ -758,10 +768,12 @@ internal sealed class RecordHudWindow : Window
                 Fill = Brushes.Transparent,
                 SnapsToDevicePixels = true
             };
+            _blurGuides = new Canvas { IsHitTestVisible = false };
             Content = new Grid
             {
                 Children =
                 {
+                    _blurGuides,
                     new Rectangle
                     {
                         Stroke = Palette.Freeze(0, 0, 0, 0xCC),
@@ -775,8 +787,7 @@ internal sealed class RecordHudWindow : Window
             SourceInitialized += (_, _) =>
             {
                 double scale = _monitor.Scale <= 0 ? 1 : _monitor.Scale;
-                const int pad = 3;
-                WindowChrome.Place(this, _x - pad, _y - pad, _w + pad * 2, _h + pad * 2, scale, topmost: true, activate: false);
+                WindowChrome.Place(this, _x - FramePad, _y - FramePad, _w + FramePad * 2, _h + FramePad * 2, scale, topmost: true, activate: false);
                 var hwnd = new WindowInteropHelper(this).Handle;
                 if (hwnd != IntPtr.Zero)
                 {
@@ -786,6 +797,39 @@ internal sealed class RecordHudWindow : Window
                     NativeMethods.SetWindowDisplayAffinity(hwnd, NativeMethods.WdaExcludeFromCapture);
                 }
             };
+        }
+
+        public void SetBlurGuides(IReadOnlyList<Rect> dipRects)
+        {
+            _blurGuides.Children.Clear();
+            double scale = _monitor.Scale <= 0 ? 1 : _monitor.Scale;
+            double offset = FramePad / scale;
+            foreach (var r in dipRects)
+            {
+                var box = new Border
+                {
+                    Width = Math.Max(4, r.Width),
+                    Height = Math.Max(4, r.Height),
+                    Background = Palette.Freeze(0x15, 0x15, 0x15, 0x48),
+                    BorderBrush = Palette.Text,
+                    BorderThickness = new Thickness(1.25),
+                    CornerRadius = new CornerRadius(3),
+                    Child = new TextBlock
+                    {
+                        Text = "BLUR",
+                        Foreground = Palette.Text,
+                        FontFamily = Palette.Mono,
+                        FontSize = 9.5,
+                        FontWeight = FontWeights.SemiBold,
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        VerticalAlignment = VerticalAlignment.Top,
+                        Margin = new Thickness(4, 2, 0, 0)
+                    }
+                };
+                Canvas.SetLeft(box, r.X + offset);
+                Canvas.SetTop(box, r.Y + offset);
+                _blurGuides.Children.Add(box);
+            }
         }
 
         public void SetRecordingState(bool recording, bool paused)

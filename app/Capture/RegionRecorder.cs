@@ -24,6 +24,7 @@ internal sealed class RegionRecorder : IScreenRecorder
     private string? _warning;
     private Exception? _fatalError;
     private volatile bool _paused;
+    private volatile IntRect[] _liveBlurRegions = Array.Empty<IntRect>();
     private long _elapsedMs;
     private int _frames;
     private bool _prevLeftDown;
@@ -34,6 +35,11 @@ internal sealed class RegionRecorder : IScreenRecorder
     public bool IsPaused => _paused;
     public TimeSpan Elapsed => TimeSpan.FromMilliseconds(Volatile.Read(ref _elapsedMs));
     public int FramesCaptured => Volatile.Read(ref _frames);
+
+    public void SetLiveBlurRegions(IReadOnlyList<IntRect> regions)
+    {
+        _liveBlurRegions = regions.Count == 0 ? Array.Empty<IntRect>() : regions.ToArray();
+    }
 
     public void Start(RecordingOptions options, string outputPath)
     {
@@ -266,6 +272,15 @@ internal sealed class RegionRecorder : IScreenRecorder
                 }
 
                 var frame = ScreenGrabber.CaptureRect(opts.ScreenX, opts.ScreenY, opts.Width, opts.Height);
+                var blurs = _liveBlurRegions;
+                if (blurs.Length > 0)
+                {
+                    foreach (var r in blurs)
+                    {
+                        if (!r.IsEmpty)
+                            frame.Pixelate(r.X, r.Y, r.Width, r.Height, block: 14);
+                    }
+                }
                 if (opts.ShowCursor)
                     CompositeCursorAndClicks(frame, opts, activeMs);
 

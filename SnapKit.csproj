@@ -13,7 +13,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.4.0</Version>
+    <Version>0.4.1</Version>
     <Product>SnapKit</Product>
     <Company>SnapKit</Company>
     <Description>Screenshot tool for documentation.</Description>

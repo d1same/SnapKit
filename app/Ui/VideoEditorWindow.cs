@@ -48,8 +48,10 @@ internal sealed class VideoEditorWindow : Window
     private readonly Dictionary<ToolMode, Border> _toolButtons = new();
     private readonly List<(string Hex, Border Swatch)> _swatches = new();
     private readonly List<(double Size, Border Dot)> _strokeDots = new();
+    private readonly List<(double Strength, Border Chip)> _blurChips = new();
     private readonly List<(ShapeFillMode Mode, Border Chip)> _fillChips = new();
     private readonly StackPanel _strokeGroup;
+    private readonly StackPanel _blurGroup;
     private readonly StackPanel _fontGroup;
     private readonly StackPanel _fillGroup;
     private readonly StackPanel _timingGroup;
@@ -242,6 +244,17 @@ internal sealed class VideoEditorWindow : Window
             _strokeGroup.Children.Add(dot);
         }
         optRow.Children.Add(_strokeGroup);
+
+        _blurGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+        _blurGroup.Children.Add(RailDivider());
+        foreach (var (strength, label) in new[] { (3.0, "Soft"), (5.0, "Med"), (9.0, "Strong") })
+        {
+            double val = strength;
+            var chip = SmallChip(label, $"Blur strength: {label}", () => SetStroke(val));
+            _blurChips.Add((val, chip));
+            _blurGroup.Children.Add(chip);
+        }
+        optRow.Children.Add(_blurGroup);
 
         _fontGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
         _fontGroup.Children.Add(RailDivider());
@@ -687,6 +700,9 @@ internal sealed class VideoEditorWindow : Window
         foreach (var (size, dot) in _strokeDots)
             dot.Background = Math.Abs(_stroke - size) < 0.6 ? Palette.Elevated : Brushes.Transparent;
 
+        foreach (var (strength, chip) in _blurChips)
+            PaintSmallChip(chip, Math.Abs(_stroke - strength) < 1.1);
+
         foreach (var (mode, chip) in _fillChips)
             PaintSmallChip(chip, _fillMode == mode);
 
@@ -695,11 +711,13 @@ internal sealed class VideoEditorWindow : Window
         var selected = _selectedId.HasValue ? _track.Find(_selectedId.Value) : null;
         var contextKind = selected?.Annotation.Kind ?? ToolToKind(_tool);
 
+        bool showBlur = contextKind == AnnotationKind.Blur;
         bool showFont = contextKind is AnnotationKind.Text or AnnotationKind.Callout or AnnotationKind.Number;
         bool showFill = contextKind is AnnotationKind.Rectangle or AnnotationKind.Ellipse;
-        bool showStroke = contextKind is AnnotationKind.Arrow or AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur;
+        bool showStroke = contextKind is AnnotationKind.Arrow or AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter;
 
         _strokeGroup.Visibility = showStroke ? Visibility.Visible : Visibility.Collapsed;
+        _blurGroup.Visibility = showBlur ? Visibility.Visible : Visibility.Collapsed;
         _fontGroup.Visibility = showFont ? Visibility.Visible : Visibility.Collapsed;
         _fillGroup.Visibility = showFill ? Visibility.Visible : Visibility.Collapsed;
 
@@ -1066,11 +1084,7 @@ internal sealed class VideoEditorWindow : Window
 
             if (drawAnn.Kind == AnnotationKind.Blur)
             {
-                // Visual preview on live playback canvas (real pixelation is baked on export)
-                var rect = AnnotationPainter.Box(drawAnn);
-                dc.PushOpacity(opacity);
-                dc.DrawRectangle(Palette.Freeze(0x18, 0x18, 0x18, 0xB8), new Pen(Palette.LineStrong, 1.5) { DashStyle = DashStyles.Dash }, rect);
-                dc.Pop();
+                DrawBlurPreview(dc, AnnotationPainter.Box(drawAnn), drawAnn.Stroke, opacity, isDraft: false);
                 continue;
             }
 
@@ -1090,8 +1104,7 @@ internal sealed class VideoEditorWindow : Window
         {
             if (_draft.Kind == AnnotationKind.Blur)
             {
-                var rect = AnnotationPainter.Box(_draft);
-                dc.DrawRectangle(Palette.Freeze(0x18, 0x18, 0x18, 0xB8), new Pen(Palette.Text, 1.5) { DashStyle = DashStyles.Dash }, rect);
+                DrawBlurPreview(dc, AnnotationPainter.Box(_draft), _draft.Stroke, 1.0, isDraft: true);
             }
             else if (_draft.Kind == AnnotationKind.Spotlight && _draft.Points.Count >= 2)
             {
@@ -1128,6 +1141,51 @@ internal sealed class VideoEditorWindow : Window
             foreach (var h in AnnotationHandles.For(mark))
                 dc.DrawEllipse(Palette.TextBright, handlePen, new Point(h.Position.X, h.Position.Y), 5.5, 5.5);
         }
+    }
+
+    private static void DrawBlurPreview(DrawingContext dc, Rect rect, double stroke, double opacity, bool isDraft)
+    {
+        if (rect.Width < 2 || rect.Height < 2)
+            return;
+
+        double tile = Math.Clamp(Math.Round(stroke * 3), 8, 28);
+        var lightTile = Palette.Freeze(0x2E, 0x2E, 0x2E, 0xCC);
+        var darkTile = Palette.Freeze(0x1C, 0x1C, 0x1C, 0xCC);
+
+        dc.PushOpacity(opacity);
+        dc.PushClip(new RectangleGeometry(rect));
+        dc.DrawRectangle(darkTile, null, rect);
+
+        int cols = (int)Math.Ceiling(rect.Width / tile);
+        int rows = (int)Math.Ceiling(rect.Height / tile);
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                if (((r + c) & 1) == 0)
+                    continue;
+                dc.DrawRectangle(lightTile, null, new Rect(rect.X + c * tile, rect.Y + r * tile, tile, tile));
+            }
+        }
+        dc.Pop();
+
+        var borderPen = new Pen(isDraft ? Palette.TextBright : Palette.LineStrong, 1.25) { DashStyle = DashStyles.Dash };
+        dc.DrawRectangle(null, borderPen, rect);
+
+        if (rect.Width >= 42 && rect.Height >= 20)
+        {
+            var tag = new FormattedText(
+                "BLUR",
+                System.Globalization.CultureInfo.CurrentUICulture,
+                FlowDirection.LeftToRight,
+                new Typeface(Palette.Mono, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+                10,
+                Palette.Text,
+                1.0);
+            dc.DrawRoundedRectangle(Palette.Freeze(0x15, 0x15, 0x15, 0xD8), null, new Rect(rect.X + 4, rect.Y + 4, tag.Width + 8, tag.Height + 3), 3, 3);
+            dc.DrawText(tag, new Point(rect.X + 8, rect.Y + 5));
+        }
+        dc.Pop();
     }
 
     // ── Export & Delivery ───────────────────────────────────────────────────────
