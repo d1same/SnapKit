@@ -240,4 +240,75 @@ internal static class ImageFile
         encoder.Save(stream);
         return path;
     }
+
+    public static bool CopyFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            return false;
+
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            try
+            {
+                var files = new System.Collections.Specialized.StringCollection { Path.GetFullPath(filePath) };
+                Clipboard.SetFileDropList(files);
+                return true;
+            }
+            catch
+            {
+                if (attempt < 9)
+                    Pump(dispatcher, 80);
+            }
+        }
+        return false;
+    }
+
+    public static string QuickSaveFile(string sourcePath, RecordingFormat format, string? customFolder = null)
+    {
+        string folder = ResolveQuickSaveFolder(customFolder);
+        Directory.CreateDirectory(folder);
+        string ext = format == RecordingFormat.Gif ? ".gif" : ".mp4";
+        string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        string path = Path.Combine(folder, $"{Brand.Name}-{stamp}{ext}");
+        for (int n = 2; File.Exists(path); n++)
+            path = Path.Combine(folder, $"{Brand.Name}-{stamp}-{n}{ext}");
+
+        File.Copy(sourcePath, path, overwrite: false);
+        return path;
+    }
+
+    public static string? SaveMedia(string sourcePath, RecordingFormat format, Window owner)
+    {
+        try { System.Windows.Input.Mouse.Capture(null); } catch { /* ignore */ }
+        using var pauseClickAway = ClickAway.Pause(owner);
+        using var suspendTopmost = WindowChrome.SuspendTopmost(owner);
+
+        string ext = format == RecordingFormat.Gif ? ".gif" : ".mp4";
+        string filter = format == RecordingFormat.Gif
+            ? "Animated GIF|*.gif"
+            : "MP4 Video|*.mp4";
+        string initialDir = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+        if (!Directory.Exists(initialDir))
+            initialDir = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = format == RecordingFormat.Gif ? "Save GIF recording" : "Save MP4 recording",
+            Filter = filter,
+            FileName = $"{Brand.Name}-{DateTime.Now:yyyyMMdd-HHmmss}{ext}",
+            InitialDirectory = Directory.Exists(initialDir) ? initialDir : "",
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+
+        bool? result = owner.AllowsTransparency
+            ? dialog.ShowDialog()
+            : dialog.ShowDialog(owner);
+        if (result != true)
+            return null;
+
+        File.Copy(sourcePath, dialog.FileName, overwrite: true);
+        return dialog.FileName;
+    }
 }

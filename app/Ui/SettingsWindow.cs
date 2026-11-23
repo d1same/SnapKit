@@ -62,7 +62,9 @@ internal sealed class SettingsWindow : Window
             CaptureAction.FullScreen,
             CaptureAction.Scrolling,
             CaptureAction.Ocr,
-            CaptureAction.RepeatLastArea
+            CaptureAction.RepeatLastArea,
+            CaptureAction.RecordVideo,
+            CaptureAction.RecordGif
         };
         for (int i = 0; i < actions.Length; i++)
         {
@@ -71,6 +73,40 @@ internal sealed class SettingsWindow : Window
             shortcutsContent.Children.Add(ShortcutRow(actions[i]));
         }
         stack.Children.Add(UiChrome.Card(shortcutsContent, new Thickness(14, 10, 14, 10)));
+
+        // Recording Card
+        stack.Children.Add(UiChrome.SectionLabel("Recording (MP4 & GIF)"));
+        var recordingContent = new StackPanel();
+        recordingContent.Children.Add(UiChrome.ToggleRow(
+            "Show cursor & click rings",
+            "Composite pointer cursor and click highlight ripples into recordings.",
+            state.Settings.RecordShowCursor,
+            value =>
+            {
+                state.Settings.RecordShowCursor = value;
+                state.SaveSettings();
+            }));
+        recordingContent.Children.Add(Hairline());
+        recordingContent.Children.Add(UiChrome.ToggleRow(
+            "Capture system audio (MP4)",
+            "Record desktop playback audio via Windows WASAPI loopback.",
+            state.Settings.RecordSystemAudio,
+            value =>
+            {
+                state.Settings.RecordSystemAudio = value;
+                state.SaveSettings();
+            }));
+        recordingContent.Children.Add(Hairline());
+        recordingContent.Children.Add(UiChrome.ToggleRow(
+            "Capture microphone (MP4)",
+            "Mix your default microphone into MP4 recordings.",
+            state.Settings.RecordMicAudio,
+            value =>
+            {
+                state.Settings.RecordMicAudio = value;
+                state.SaveSettings();
+            }));
+        stack.Children.Add(UiChrome.Card(recordingContent, new Thickness(10, 6, 10, 6)));
 
         // Behavior Card
         stack.Children.Add(UiChrome.SectionLabel("Behavior"));
@@ -365,6 +401,8 @@ internal sealed class SettingsWindow : Window
         CaptureAction.Scrolling => "Scrolling capture",
         CaptureAction.Ocr => "OCR",
         CaptureAction.RepeatLastArea => "Repeat last area",
+        CaptureAction.RecordVideo => "Record video (MP4)",
+        CaptureAction.RecordGif => "Record GIF",
         _ => action.ToString()
     };
 }

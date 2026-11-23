@@ -1,0 +1,671 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Effects;
+using System.Windows.Shapes;
+using System.Windows.Threading;
+
+namespace SnapKit;
+
+/// <summary>
+/// Click-through recording outline frame + Style 3 floating Start/Pause/Stop HUD.
+/// Both windows are excluded from screen capture via WDA_EXCLUDEFROMCAPTURE.
+/// </summary>
+internal sealed class RecordHudWindow : Window
+{
+    private static readonly SolidColorBrush RecRed = Palette.Freeze(0xEF, 0x44, 0x44);
+
+    private readonly AppState _state;
+    private readonly MonitorInfo _monitor;
+    private readonly int _screenX;
+    private readonly int _screenY;
+    private readonly int _rawW;
+    private readonly int _rawH;
+    private readonly Action _onClosedAll;
+    private readonly RecordFrameWindow _frameWindow;
+    private readonly DispatcherTimer _timer;
+
+    private readonly StackPanel _readyRow;
+    private readonly StackPanel _liveRow;
+    private readonly Border _mp4Chip;
+    private readonly Border _gifChip;
+    private readonly Border _cursorChip;
+    private readonly Border _micChip;
+    private readonly Border _sysChip;
+    private readonly TextBlock _dimsText;
+    private readonly Ellipse _liveDot;
+    private readonly TextBlock _liveFormat;
+    private readonly TextBlock _liveTime;
+    private readonly TextBlock _pauseLabel;
+    private readonly Border _pauseChip;
+    private readonly Border _stopChip;
+    private readonly TextBlock _stopLabel;
+
+    private RecordingFormat _format;
+    private bool _showCursor;
+    private bool _recordMic;
+    private bool _recordSystem;
+    private RegionRecorder? _recorder;
+    private bool _stopping;
+    private bool _pulseOn;
+
+    public RecordHudWindow(
+        AppState state,
+        MonitorInfo monitor,
+        int screenX,
+        int screenY,
+        int width,
+        int height,
+        RecordingFormat initialFormat,
+        Action onClosedAll)
+    {
+        _state = state;
+        _monitor = monitor;
+        _screenX = screenX;
+        _screenY = screenY;
+        _rawW = Math.Max(16, width);
+        _rawH = Math.Max(16, height);
+        _format = initialFormat;
+        _showCursor = state.Settings.RecordShowCursor;
+        _recordMic = state.Settings.RecordMicAudio;
+        _recordSystem = state.Settings.RecordSystemAudio;
+        _onClosedAll = onClosedAll;
+
+        Title = Brand.Name + " Recorder";
+        WindowStyle = WindowStyle.None;
+        AllowsTransparency = true;
+        Background = Brushes.Transparent;
+        ResizeMode = ResizeMode.NoResize;
+        Topmost = true;
+        ShowInTaskbar = true;
+        SizeToContent = SizeToContent.WidthAndHeight;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+
+        _frameWindow = new RecordFrameWindow(monitor, screenX, screenY, _rawW, _rawH);
+
+        // ── Ready row (before recording starts) ────────────────────────────────
+        _readyRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        _mp4Chip = ToggleChip("MP4", "Record H.264 MP4 video", () => SetFormat(RecordingFormat.Mp4));
+        _gifChip = ToggleChip("GIF", "Record animated GIF", () => SetFormat(RecordingFormat.Gif));
+        _cursorChip = ToggleChip("Cursor", "Include pointer cursor & click highlight rings", () =>
+        {
+            _showCursor = !_showCursor;
+            _state.Settings.RecordShowCursor = _showCursor;
+            SavePrefs();
+            RefreshReadyState();
+        });
+        _sysChip = ToggleChip("Audio", "Capture system audio (WASAPI loopback)", () =>
+        {
+            _recordSystem = !_recordSystem;
+            _state.Settings.RecordSystemAudio = _recordSystem;
+            SavePrefs();
+            RefreshReadyState();
+        });
+        _micChip = ToggleChip("Mic", "Capture default microphone", () =>
+        {
+            _recordMic = !_recordMic;
+            _state.Settings.RecordMicAudio = _recordMic;
+            SavePrefs();
+            RefreshReadyState();
+        });
+
+        _dimsText = new TextBlock
+        {
+            Foreground = Palette.Muted,
+            FontFamily = Palette.Mono,
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 4, 0)
+        };
+
+        var recDot = new Ellipse
+        {
+            Width = 8,
+            Height = 8,
+            Fill = RecRed,
+            Margin = new Thickness(0, 0, 6, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var recBtn = new Border
+        {
+            Height = 28,
+            Padding = new Thickness(11, 0, 12, 0),
+            Margin = new Thickness(4, 0, 3, 0),
+            CornerRadius = new CornerRadius(7),
+            Background = Palette.ActiveSurface,
+            Cursor = Cursors.Hand,
+            ToolTip = "Start recording  (Enter)",
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children =
+                {
+                    recDot,
+                    new TextBlock
+                    {
+                        Text = "Record",
+                        Foreground = Palette.Ink,
+                        FontFamily = Palette.Font,
+                        FontSize = 12.5,
+                        FontWeight = FontWeights.SemiBold,
+                        VerticalAlignment = VerticalAlignment.Center
+                    }
+                }
+            }
+        };
+        recBtn.MouseEnter += (_, _) => recBtn.Background = Palette.ActiveHover;
+        recBtn.MouseLeave += (_, _) => recBtn.Background = Palette.ActiveSurface;
+        recBtn.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        recBtn.MouseLeftButtonUp += (_, e) => { e.Handled = true; StartRecording(); };
+
+        var cancelBtn = IconButton("×", "Cancel  (Esc)", CancelAndClose);
+
+        _readyRow.Children.Add(_mp4Chip);
+        _readyRow.Children.Add(_gifChip);
+        _readyRow.Children.Add(Hairline());
+        _readyRow.Children.Add(_cursorChip);
+        _readyRow.Children.Add(_sysChip);
+        _readyRow.Children.Add(_micChip);
+        _readyRow.Children.Add(Hairline());
+        _readyRow.Children.Add(_dimsText);
+        _readyRow.Children.Add(recBtn);
+        _readyRow.Children.Add(cancelBtn);
+
+        // ── Live row (while recording) ─────────────────────────────────────────
+        _liveRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed
+        };
+        _liveDot = new Ellipse
+        {
+            Width = 9,
+            Height = 9,
+            Fill = RecRed,
+            Margin = new Thickness(4, 0, 7, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _liveFormat = new TextBlock
+        {
+            Text = "MP4",
+            Foreground = Palette.Muted,
+            FontFamily = Palette.Mono,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        _liveTime = new TextBlock
+        {
+            Text = "00:00",
+            Foreground = Palette.Text,
+            FontFamily = Palette.Mono,
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            MinWidth = 44,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        _pauseLabel = new TextBlock
+        {
+            Text = "Pause",
+            Foreground = Palette.Text,
+            FontFamily = Palette.Font,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _pauseChip = ActionPill(_pauseLabel, "Pause or resume recording", TogglePause, primary: false);
+
+        _stopLabel = new TextBlock
+        {
+            Text = "■  Stop",
+            Foreground = Palette.Ink,
+            FontFamily = Palette.Font,
+            FontSize = 12.5,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _stopChip = ActionPill(_stopLabel, "Stop recording and finish", () => _ = StopAndPresentAsync(), primary: true);
+
+        _liveRow.Children.Add(_liveDot);
+        _liveRow.Children.Add(_liveFormat);
+        _liveRow.Children.Add(_liveTime);
+        _liveRow.Children.Add(Hairline());
+        _liveRow.Children.Add(_pauseChip);
+        _liveRow.Children.Add(_stopChip);
+
+        var pill = new Border
+        {
+            Margin = new Thickness(10),
+            Background = Palette.Toolbar,
+            BorderBrush = Palette.Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(11),
+            Padding = new Thickness(8, 5, 8, 5),
+            SnapsToDevicePixels = true,
+            Effect = new DropShadowEffect
+            {
+                BlurRadius = 18,
+                ShadowDepth = 3,
+                Opacity = 0.5,
+                Color = Colors.Black
+            },
+            Child = new Grid { Children = { _readyRow, _liveRow } }
+        };
+        Content = pill;
+
+        MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.Handled)
+                return;
+            try { DragMove(); } catch { /* mouse released */ }
+        };
+        PreviewKeyDown += (_, e) =>
+        {
+            if (_recorder == null)
+            {
+                if (e.Key == Key.Escape)
+                {
+                    CancelAndClose();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Enter)
+                {
+                    StartRecording();
+                    e.Handled = true;
+                }
+            }
+        };
+
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _timer.Tick += OnTick;
+
+        SourceInitialized += (_, _) =>
+        {
+            ExcludeFromCapture(this);
+            PositionHud();
+        };
+        Closed += (_, _) =>
+        {
+            _timer.Stop();
+            _frameWindow.SafeClose();
+            if (_recorder is { IsRecording: true })
+            {
+                try { _recorder.Dispose(); } catch { /* ignore */ }
+            }
+            _onClosedAll();
+        };
+
+        RefreshReadyState();
+    }
+
+    public void ShowWithFrame()
+    {
+        _frameWindow.Show();
+        Show();
+        Activate();
+    }
+
+    public void StopFromHotkey()
+    {
+        if (_recorder != null && !_stopping)
+            _ = StopAndPresentAsync();
+        else if (_recorder == null)
+            CancelAndClose();
+    }
+
+    private void SetFormat(RecordingFormat format)
+    {
+        _format = format;
+        RefreshReadyState();
+    }
+
+    private void RefreshReadyState()
+    {
+        PaintToggle(_mp4Chip, _format == RecordingFormat.Mp4);
+        PaintToggle(_gifChip, _format == RecordingFormat.Gif);
+        PaintToggle(_cursorChip, _showCursor);
+        bool isMp4 = _format == RecordingFormat.Mp4;
+        _sysChip.Visibility = isMp4 ? Visibility.Visible : Visibility.Collapsed;
+        _micChip.Visibility = isMp4 ? Visibility.Visible : Visibility.Collapsed;
+        PaintToggle(_sysChip, _recordSystem);
+        PaintToggle(_micChip, _recordMic);
+
+        int w = isMp4 ? Math.Max(16, _rawW & ~1) : _rawW;
+        int h = isMp4 ? Math.Max(16, _rawH & ~1) : _rawH;
+        _dimsText.Text = $"{w}×{h}";
+    }
+
+    private void StartRecording()
+    {
+        if (_recorder != null)
+            return;
+
+        try
+        {
+            string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "SnapKit-recordings");
+            Directory.CreateDirectory(tempDir);
+            string ext = _format == RecordingFormat.Gif ? ".gif" : ".mp4";
+            string outPath = System.IO.Path.Combine(tempDir, $"{Brand.Name}-{DateTime.Now:yyyyMMdd-HHmmss}{ext}");
+
+            int fps = _format == RecordingFormat.Gif
+                ? Math.Clamp(_state.Settings.RecordGifFps, 5, 25)
+                : Math.Clamp(_state.Settings.RecordVideoFps, 15, 60);
+
+            var options = new RecordingOptions(
+                _screenX,
+                _screenY,
+                _rawW,
+                _rawH,
+                _monitor.Scale <= 0 ? 1 : _monitor.Scale,
+                _format,
+                fps,
+                _showCursor,
+                _format == RecordingFormat.Mp4 && _recordMic,
+                _format == RecordingFormat.Mp4 && _recordSystem);
+
+            _recorder = new RegionRecorder();
+            _recorder.Start(options, outPath);
+
+            _readyRow.Visibility = Visibility.Collapsed;
+            _liveRow.Visibility = Visibility.Visible;
+            _liveFormat.Text = _format == RecordingFormat.Gif ? "GIF" : "MP4";
+            _liveTime.Text = "00:00";
+            _frameWindow.SetRecordingState(recording: true, paused: false);
+            _timer.Start();
+        }
+        catch (Exception ex)
+        {
+            _recorder?.Dispose();
+            _recorder = null;
+            _state.Tray?.Balloon(Brand.Name, "Could not start recording: " + ex.Message);
+        }
+    }
+
+    private void TogglePause()
+    {
+        if (_recorder == null || _stopping)
+            return;
+        bool next = !_recorder.IsPaused;
+        _recorder.SetPaused(next);
+        _pauseLabel.Text = next ? "Resume" : "Pause";
+        _liveDot.Fill = next ? Palette.Muted : RecRed;
+        _frameWindow.SetRecordingState(recording: true, paused: next);
+    }
+
+    private async Task StopAndPresentAsync()
+    {
+        if (_recorder == null || _stopping)
+            return;
+        _stopping = true;
+        _timer.Stop();
+        _pauseChip.IsEnabled = false;
+        _stopChip.IsEnabled = false;
+        _stopLabel.Text = "Finishing…";
+
+        try
+        {
+            var result = await _recorder.StopAsync();
+            _recorder = null;
+            _frameWindow.SafeClose();
+            Close();
+
+            var done = new RecordingDoneWindow(result, _state);
+            done.Show();
+            done.Activate();
+        }
+        catch (Exception ex)
+        {
+            _recorder = null;
+            _frameWindow.SafeClose();
+            Close();
+            _state.Tray?.Balloon(Brand.Name, "Recording failed: " + ex.Message);
+        }
+    }
+
+    private void OnTick(object? sender, EventArgs e)
+    {
+        if (_recorder == null)
+            return;
+        var elapsed = _recorder.Elapsed;
+        _liveTime.Text = elapsed.TotalHours >= 1
+            ? elapsed.ToString(@"hh\:mm\:ss")
+            : elapsed.ToString(@"mm\:ss");
+        if (!_recorder.IsPaused)
+        {
+            _pulseOn = !_pulseOn;
+            _liveDot.Opacity = _pulseOn ? 1.0 : 0.35;
+        }
+        else
+        {
+            _liveDot.Opacity = 0.6;
+        }
+    }
+
+    private void CancelAndClose()
+    {
+        _frameWindow.SafeClose();
+        Close();
+    }
+
+    private void PositionHud()
+    {
+        double scale = _monitor.Scale <= 0 ? 1 : _monitor.Scale;
+        UpdateLayout();
+        double hudW = ActualWidth > 0 ? ActualWidth : 440;
+        double hudH = ActualHeight > 0 ? ActualHeight : 60;
+
+        double targetLeft = (_screenX + _rawW / 2.0) / scale - hudW / 2.0;
+        double belowTop = (_screenY + _rawH) / scale + 6;
+        double aboveTop = _screenY / scale - hudH - 6;
+
+        double minLeft = _monitor.X / scale;
+        double maxLeft = _monitor.Right / scale - hudW;
+        double minTop = _monitor.Y / scale;
+        double maxTop = _monitor.Bottom / scale - hudH;
+
+        Left = Math.Clamp(targetLeft, minLeft, Math.Max(minLeft, maxLeft));
+        if (belowTop <= maxTop)
+            Top = belowTop;
+        else if (aboveTop >= minTop)
+            Top = aboveTop;
+        else
+            Top = Math.Max(minTop, maxTop);
+    }
+
+    private void SavePrefs()
+    {
+        try { SettingsStore.Save(_state.Settings); } catch { /* ignore */ }
+    }
+
+    private static void ExcludeFromCapture(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd != IntPtr.Zero)
+            NativeMethods.SetWindowDisplayAffinity(hwnd, NativeMethods.WdaExcludeFromCapture);
+    }
+
+    private static Border Hairline() => new()
+    {
+        Width = 1,
+        Height = 16,
+        Background = Palette.Divider,
+        Margin = new Thickness(6, 0, 6, 0),
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private static Border ToggleChip(string label, string tip, Action click)
+    {
+        var chip = new Border
+        {
+            Height = 24,
+            Margin = new Thickness(1, 0, 1, 0),
+            Padding = new Thickness(8, 0, 8, 0),
+            CornerRadius = new CornerRadius(6),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tip,
+            SnapsToDevicePixels = true,
+            Child = new TextBlock
+            {
+                Text = label,
+                Foreground = Palette.Muted,
+                FontFamily = Palette.Font,
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+        chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        return chip;
+    }
+
+    private static void PaintToggle(Border chip, bool on)
+    {
+        chip.Background = on ? Palette.ActiveSurface : Brushes.Transparent;
+        if (chip.Child is TextBlock tb)
+            tb.Foreground = on ? Palette.Ink : Palette.Muted;
+    }
+
+    private static Border ActionPill(TextBlock label, string tip, Action click, bool primary)
+    {
+        var idle = primary ? Palette.ActiveSurface : Palette.Elevated;
+        var hover = primary ? Palette.ActiveHover : Palette.Hover;
+        var chip = new Border
+        {
+            Height = 28,
+            Margin = new Thickness(3, 0, 2, 0),
+            Padding = new Thickness(11, 0, 11, 0),
+            CornerRadius = new CornerRadius(7),
+            Background = idle,
+            BorderBrush = primary ? Palette.ActiveSurface : Palette.Line,
+            BorderThickness = new Thickness(primary ? 0 : 1),
+            Cursor = Cursors.Hand,
+            ToolTip = tip,
+            Child = label,
+            SnapsToDevicePixels = true
+        };
+        chip.MouseEnter += (_, _) => { if (chip.IsEnabled) chip.Background = hover; };
+        chip.MouseLeave += (_, _) => chip.Background = idle;
+        chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; if (chip.IsEnabled) click(); };
+        return chip;
+    }
+
+    private static Border IconButton(string glyph, string tip, Action click)
+    {
+        var chip = new Border
+        {
+            Width = 26,
+            Height = 26,
+            Margin = new Thickness(2, 0, 0, 0),
+            CornerRadius = new CornerRadius(6),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tip,
+            Child = new TextBlock
+            {
+                Text = glyph,
+                Foreground = Palette.Muted,
+                FontFamily = Palette.Font,
+                FontSize = 14,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+        chip.MouseEnter += (_, _) => chip.Background = Palette.Hover;
+        chip.MouseLeave += (_, _) => chip.Background = Brushes.Transparent;
+        chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        return chip;
+    }
+
+    private sealed class RecordFrameWindow : Window
+    {
+        private readonly Rectangle _dash;
+        private readonly MonitorInfo _monitor;
+        private readonly int _x;
+        private readonly int _y;
+        private readonly int _w;
+        private readonly int _h;
+        private bool _closed;
+
+        public RecordFrameWindow(MonitorInfo monitor, int screenX, int screenY, int width, int height)
+        {
+            _monitor = monitor;
+            _x = screenX;
+            _y = screenY;
+            _w = width;
+            _h = height;
+
+            WindowStyle = WindowStyle.None;
+            AllowsTransparency = true;
+            Background = Brushes.Transparent;
+            ResizeMode = ResizeMode.NoResize;
+            Topmost = true;
+            ShowInTaskbar = false;
+            ShowActivated = false;
+            IsHitTestVisible = false;
+            WindowStartupLocation = WindowStartupLocation.Manual;
+
+            _dash = new Rectangle
+            {
+                Stroke = Palette.Text,
+                StrokeThickness = 2,
+                StrokeDashArray = new DoubleCollection { 5, 4 },
+                Fill = Brushes.Transparent,
+                SnapsToDevicePixels = true
+            };
+            Content = new Grid
+            {
+                Children =
+                {
+                    new Rectangle
+                    {
+                        Stroke = Palette.Freeze(0, 0, 0, 0xCC),
+                        StrokeThickness = 3,
+                        Fill = Brushes.Transparent
+                    },
+                    _dash
+                }
+            };
+
+            SourceInitialized += (_, _) =>
+            {
+                double scale = _monitor.Scale <= 0 ? 1 : _monitor.Scale;
+                const int pad = 3;
+                WindowChrome.Place(this, _x - pad, _y - pad, _w + pad * 2, _h + pad * 2, scale, topmost: true, activate: false);
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    long ex = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle).ToInt64();
+                    ex |= NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow;
+                    NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlExStyle, new IntPtr(ex));
+                    NativeMethods.SetWindowDisplayAffinity(hwnd, NativeMethods.WdaExcludeFromCapture);
+                }
+            };
+        }
+
+        public void SetRecordingState(bool recording, bool paused)
+        {
+            _dash.Stroke = !recording
+                ? Palette.Text
+                : paused ? Palette.Muted : RecRed;
+        }
+
+        public void SafeClose()
+        {
+            if (_closed)
+                return;
+            _closed = true;
+            try { Close(); } catch { /* already closed */ }
+        }
+    }
+}

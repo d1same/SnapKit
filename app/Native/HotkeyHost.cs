@@ -96,6 +96,8 @@ internal sealed class HotkeyHost : IDisposable
         CaptureAction.Scrolling => "Scrolling capture",
         CaptureAction.Ocr => "OCR",
         CaptureAction.RepeatLastArea => "Repeat last area",
+        CaptureAction.RecordVideo => "Record video (MP4)",
+        CaptureAction.RecordGif => "Record GIF",
         _ => action.ToString()
     };
 }

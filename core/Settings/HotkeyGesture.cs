@@ -9,7 +9,9 @@ public enum CaptureAction
     FullScreen,
     Scrolling,
     Ocr,
-    RepeatLastArea
+    RepeatLastArea,
+    RecordVideo,
+    RecordGif
 }
 
 public sealed class HotkeyGesture

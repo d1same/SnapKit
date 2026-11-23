@@ -18,6 +18,8 @@ internal sealed class TrayHost : IDisposable
     private readonly ToolStripMenuItem _fullScreenItem;
     private readonly ToolStripMenuItem _scrollingItem;
     private readonly ToolStripMenuItem _ocrItem;
+    private readonly ToolStripMenuItem _recordVideoItem;
+    private readonly ToolStripMenuItem _recordGifItem;
     private readonly ToolStripMenuItem _recent;
     private readonly ToolStripMenuItem _updateItem;
     private Icon _currentIcon;
@@ -44,6 +46,9 @@ internal sealed class TrayHost : IDisposable
         _menu.Items.Add(delayed);
 
         _ocrItem = Add("OCR", () => state.Coordinator.Start(CaptureAction.Ocr));
+        _menu.Items.Add(new ToolStripSeparator());
+        _recordVideoItem = Add("Record video (MP4)", () => state.Coordinator.Start(CaptureAction.RecordVideo));
+        _recordGifItem = Add("Record GIF", () => state.Coordinator.Start(CaptureAction.RecordGif));
         _menu.Items.Add(new ToolStripSeparator());
 
         _recent = SubmenuItem("Recent captures");
@@ -184,6 +189,8 @@ internal sealed class TrayHost : IDisposable
         ApplyShortcut(_fullScreenItem, CaptureAction.FullScreen);
         ApplyShortcut(_scrollingItem, CaptureAction.Scrolling);
         ApplyShortcut(_ocrItem, CaptureAction.Ocr);
+        ApplyShortcut(_recordVideoItem, CaptureAction.RecordVideo);
+        ApplyShortcut(_recordGifItem, CaptureAction.RecordGif);
 
         var last = _state.Settings.LastArea;
         if (last != null && last.IsValid)

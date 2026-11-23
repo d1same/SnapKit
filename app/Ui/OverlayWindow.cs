@@ -20,7 +20,9 @@ internal enum OverlayPurpose
 {
     Edit,
     Ocr,
-    Scroll
+    Scroll,
+    RecordVideo,
+    RecordGif
 }
 
 internal sealed class CapturePick
@@ -58,7 +60,7 @@ internal sealed class OverlaySession
 
     public void SetMode(OverlayMode mode)
     {
-        if (Frozen || Purpose != OverlayPurpose.Edit)
+        if (Frozen || Purpose is not (OverlayPurpose.Edit or OverlayPurpose.RecordVideo or OverlayPurpose.RecordGif))
             return;
         Mode = mode;
         foreach (var window in _windows)
@@ -421,12 +423,18 @@ internal sealed class OverlayWindow : Window
 
     public void RefreshChrome()
     {
+        string prefix = _session.Purpose switch
+        {
+            OverlayPurpose.RecordVideo => "Record MP4    ·    ",
+            OverlayPurpose.RecordGif => "Record GIF    ·    ",
+            _ => ""
+        };
         _hintText.Text = _session.Mode switch
         {
-            OverlayMode.Window => "Window    ·    Click the highlighted window    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
-            OverlayMode.FullScreen => "Full screen    ·    Click to capture this monitor    ·    Space changes mode    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
+            OverlayMode.Window => prefix + "Window    ·    Click the highlighted window    ·    Space changes mode    ·    Esc cancels",
+            OverlayMode.FullScreen => prefix + "Full screen    ·    Click to select this monitor    ·    Space changes mode    ·    Esc cancels",
             OverlayMode.ScrollPick => "Click the window to scroll-capture    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
-            _ => "The choices stay at the top. Drag a box, or click one. Esc cancels"
+            _ => prefix + "Drag an area or click a window/region    ·    Space changes mode    ·    Esc cancels"
         };
         Cursor = _session.Mode == OverlayMode.Area ? Cursors.Cross : Cursors.Hand;
         if (_session.Mode != OverlayMode.Area)
@@ -452,7 +460,7 @@ internal sealed class OverlayWindow : Window
         }
         if (_frozen)
             return;
-        if (e.Key == Key.Space && _session.Purpose == OverlayPurpose.Edit)
+        if (e.Key == Key.Space && _session.Purpose is OverlayPurpose.Edit or OverlayPurpose.RecordVideo or OverlayPurpose.RecordGif)
         {
             var next = _session.Mode switch
             {

@@ -16,8 +16,10 @@ internal static class NativeMethods
     public const int WsCaption = 0x00C00000;
     public const int WsThickFrame = 0x00040000;
     public const int WsExToolWindow = 0x00000080;
+    public const int WsExTransparent = 0x00000020;
     public const int WsExAppWindow = 0x00040000;
     public const int WsExNoActivate = 0x08000000;
+    public const uint WdaExcludeFromCapture = 0x00000011;
     public const int WmMouseActivate = 0x0021;
     public const int MaNoActivate = 3;
     public const int MonitorDefaultToNearest = 2;
@@ -28,6 +30,8 @@ internal static class NativeMethods
     public const int WmSysKeyDown = 0x0104;
     public const int WmHotkey = 0x0312;
     public const int WmMouseWheel = 0x020A;
+    public const int VkLButton = 0x01;
+    public const int VkRButton = 0x02;
     public const int VkEscape = 0x1B;
     public const int VkShift = 0x10;
     public const int VkControl = 0x11;
@@ -106,6 +110,7 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")] public static extern int DwmGetWindowAttributeRect(IntPtr hwnd, int attr, out Rect rect, int size);
     [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")] public static extern int DwmGetWindowAttributeInt(IntPtr hwnd, int attr, out int value, int size);
     [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+    [DllImport("user32.dll", SetLastError = true)] public static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
     [DllImport("winmm.dll", SetLastError = true)] public static extern bool PlaySound(byte[] sound, IntPtr module, uint flags);
 
     public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdc, IntPtr lprcMonitor, IntPtr data);

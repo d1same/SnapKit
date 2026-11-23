@@ -83,7 +83,28 @@ public partial class App : System.Windows.Application
                 _state.Tray.Balloon(Brand.Name, "Installed. SnapKit " + ReleaseClient.Display + " starts with Windows and sits next to the clock. Ctrl+Alt+Shift+Esc quits if a window gets stuck.");
             _ = Task.Run(ReleaseClient.CleanupTempDownloads);
         }
+        _ = Task.Run(CleanupTempRecordings);
         UpdateCheck.Queue();
+    }
+
+    private static void CleanupTempRecordings()
+    {
+        try
+        {
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "SnapKit-recordings");
+            if (!System.IO.Directory.Exists(dir))
+                return;
+            foreach (var file in System.IO.Directory.EnumerateFiles(dir))
+            {
+                try
+                {
+                    if ((DateTime.UtcNow - System.IO.File.GetLastWriteTimeUtc(file)) > TimeSpan.FromHours(12))
+                        System.IO.File.Delete(file);
+                }
+                catch { /* in use */ }
+            }
+        }
+        catch { /* best effort */ }
     }
 
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)

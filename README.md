@@ -8,13 +8,13 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit.
 
-[SnapKit 0.2.2](https://github.com/d1same/SnapKit/releases/tag/v0.2.2)
+[SnapKit 0.3.0](https://github.com/d1same/SnapKit/releases/tag/v0.3.0)
 
 Download `SnapKit-win-x64.zip` from that release. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. A non-blocking progress window stays responsive while it copies, so the install is never a silent pause. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip shows **Updating SnapKit**, closes whatever SnapKit is already running, and replaces it.
 
-This build is **0.2.2**. After it is running it periodically checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, a badge appears on the tray icon and menu, and an update window shows both versions along with the GitHub release notes. **Update now** streams the download into a versioned temp folder with live `%` and MB progress, then the new copy shows a non-blocking install window while replacing the old one and relaunches with an `--updated` toast and automatic temp cleanup. Both the tray menu and Settings also have **Check for updates…**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
+This build is **0.3.0**. After it is running it periodically checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, a badge appears on the tray icon and menu, and an update window shows both versions along with the GitHub release notes. **Update now** streams the download into a versioned temp folder with live `%` and MB progress, then the new copy shows a non-blocking install window while replacing the old one and relaunches with an `--updated` toast and automatic temp cleanup. Both the tray menu and Settings also have **Check for updates…**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -36,6 +36,8 @@ You drag a box around a dialog, press `T`, type "Click Save", then press the cri
 - Scrolling capture
 - Delayed capture (3 seconds, 5 seconds, or 10 seconds)
 - OCR (drag an area, text goes to the clipboard)
+- Record video (MP4) — zero-dependency Windows Media Foundation H.264 + WASAPI audio
+- Record GIF — zero-dependency pure-C# GIF89a animated capture
 - Recent captures (last 10, memory only)
 - Check for updates… (highlights with an indicator dot when an update is available)
 - Settings / Shortcuts
@@ -93,6 +95,12 @@ Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` 
 
 OCR reads the capture on the PC, then highlights each word on the picture. The highlight sits on the word at 100%, 125%, 150%, and 200% scaling, including a monitor that is not at the top-left of the desktop. Drag across the words you want and that text is copied in reading order. `Ctrl+A` copies all of it. `Esc` closes the highlighter and leaves the capture editable. If OCR fails, the message stays in a small window with **Copy error**. OCR uses the Windows language already installed. No cloud.
 
+### Recording (MP4 & GIF)
+
+Choose **Record video (MP4)** (`Ctrl+Alt+V`) or **Record GIF** (`Ctrl+Alt+G`), drag an area or click a window (`Space` switches mode), then use the floating HUD to toggle **MP4 / GIF**, **Cursor** (pointer + click highlight rings), and **Audio** (system playback via WASAPI loopback) / **Mic** for MP4. Click **Record** (or press `Enter`) to start, **Pause / Resume** anytime, and **Stop** (or press the record hotkey again) to finish. Both the dashed frame and floating HUD are excluded from the captured recording.
+
+When finished, **Copy file** (`Ctrl+C`) copies the `.mp4` or `.gif` file directly to the clipboard so `Ctrl+V` pastes it straight into Slack, Teams, Discord, GitHub, or Explorer; **Quick Save** (`Ctrl+Shift+S`) saves immediately to your Quick Save folder; **Save as…** (`Ctrl+S`) opens Explorer; and **Play** previews it. Zero external installs or FFmpeg required.
+
 ### Global shortcuts
 
 These are the defaults. Change them in Settings. They are stored in `%APPDATA%\SnapKit\settings.json`.
@@ -105,11 +113,13 @@ These are the defaults. Change them in Settings. They are stored in `%APPDATA%\S
 | `Ctrl+Shift+PrtSc` | Scrolling capture |
 | `Ctrl+Shift+O` | OCR |
 | `Ctrl+Alt+PrtSc` | Repeat last area |
+| `Ctrl+Alt+V` | Record video (MP4) |
+| `Ctrl+Alt+G` | Record GIF |
 | `Ctrl+Alt+Shift+Esc` | Quit SnapKit immediately |
 
 Windows 11 often gives `PrtSc` to the Snipping Tool. Turn that off in Windows Settings, then set SnapKit's keys again if a shortcut fails to register.
 
-Settings also configures **Start with Windows** (on), **Close shot on click-away** (on), **Capture flash** (on), **Shutter sound** (off), your **Quick Save** folder (default `Pictures\SnapKit`), and **Check for updates**. The tray tooltip shows the version (and update status). On Windows 11 the tray icon is placed next to the clock. If it still lands in the overflow, open Settings → Personalization → Taskbar → Other system tray icons and turn SnapKit on.
+Settings also configures **Start with Windows** (on), **Close shot on click-away** (on), **Capture flash** (on), **Shutter sound** (off), recording defaults (cursor & click rings, system audio, microphone), your **Quick Save** folder (default `Pictures\SnapKit`), and **Check for updates**. The tray tooltip shows the version (and update status). On Windows 11 the tray icon is placed next to the clock. If it still lands in the overflow, open Settings → Personalization → Taskbar → Other system tray icons and turn SnapKit on.
 
 ## Change the name
 
@@ -132,10 +142,6 @@ Core tests, which run anywhere:
 ```bash
 dotnet test tests/SnapKit.Core.Tests/SnapKit.Core.Tests.csproj -c Release
 ```
-
-## Not in v1
-
-GIF and MP4 recording is left for v2. The hook is `IScreenRecorder` in `app/Capture/IScreenRecorder.cs`. The intended stack is Windows.Graphics.Capture plus FFmpeg.
 
 ## Limits
 

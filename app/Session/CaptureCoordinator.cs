@@ -6,9 +6,9 @@ internal sealed class CaptureCoordinator
 {
     private readonly AppState _state;
     private readonly List<Window> _hidden = new();
+    private RecordHudWindow? _activeRecordHud;
     private bool _busy;
 
-    // v2: assign a Windows.Graphics.Capture + FFmpeg recorder here.
     public IScreenRecorder? Recorder { get; set; }
 
     public CaptureCoordinator(AppState state) => _state = state;
@@ -35,7 +35,23 @@ internal sealed class CaptureCoordinator
             case CaptureAction.RepeatLastArea:
                 _ = RunRepeatLastArea();
                 break;
+            case CaptureAction.RecordVideo:
+                StartRecord(RecordingFormat.Mp4);
+                break;
+            case CaptureAction.RecordGif:
+                StartRecord(RecordingFormat.Gif);
+                break;
         }
+    }
+
+    public void StartRecord(RecordingFormat format)
+    {
+        if (_activeRecordHud != null)
+        {
+            _activeRecordHud.StopFromHotkey();
+            return;
+        }
+        _ = RunOverlay(OverlayMode.Area, format == RecordingFormat.Gif ? OverlayPurpose.RecordGif : OverlayPurpose.RecordVideo);
     }
 
     public void StartRepeatLastArea() => _ = RunRepeatLastArea();
@@ -57,7 +73,7 @@ internal sealed class CaptureCoordinator
             if (shots.Count == 0)
                 throw new InvalidOperationException("No monitors were found.");
 
-            if (purpose != OverlayPurpose.Scroll)
+            if (purpose is not (OverlayPurpose.Scroll or OverlayPurpose.RecordVideo or OverlayPurpose.RecordGif))
                 Feedback(shots.Select(shot => shot.Monitor));
             var session = new OverlaySession(shots, mode, purpose)
             {
@@ -95,6 +111,26 @@ internal sealed class CaptureCoordinator
         _busy = false;
         if (pick?.Image == null || pick.Monitor == null)
             return;
+        if (purpose is OverlayPurpose.RecordVideo or OverlayPurpose.RecordGif)
+        {
+            var format = purpose == OverlayPurpose.RecordGif ? RecordingFormat.Gif : RecordingFormat.Mp4;
+            var picked = pick;
+            System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                var hud = new RecordHudWindow(
+                    _state,
+                    picked.Monitor!,
+                    picked.ScreenX,
+                    picked.ScreenY,
+                    picked.Image!.Width,
+                    picked.Image.Height,
+                    format,
+                    () => _activeRecordHud = null);
+                _activeRecordHud = hud;
+                hud.ShowWithFrame();
+            }));
+            return;
+        }
         if (purpose == OverlayPurpose.Ocr)
         {
             var image = pick.Image;

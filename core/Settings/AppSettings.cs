@@ -18,6 +18,8 @@ public sealed class AppSettings
     public HotkeyGesture Scrolling { get; set; } = new() { VirtualKey = 0x2C, Ctrl = true, Shift = true };
     public HotkeyGesture Ocr { get; set; } = new() { VirtualKey = 0x4F, Ctrl = true, Shift = true };
     public HotkeyGesture RepeatLastArea { get; set; } = new() { VirtualKey = 0x2C, Ctrl = true, Alt = true };
+    public HotkeyGesture RecordVideo { get; set; } = new() { VirtualKey = 0x56, Ctrl = true, Alt = true };
+    public HotkeyGesture RecordGif { get; set; } = new() { VirtualKey = 0x47, Ctrl = true, Alt = true };
     public bool StartWithWindows { get; set; } = true;
 
     /// <summary>
@@ -39,7 +41,12 @@ public sealed class AppSettings
     public ShapeFillMode LastFillMode { get; set; } = ShapeFillMode.Outline;
     public BackdropPreset LastBackdrop { get; set; } = BackdropPreset.None;
 
-    // v2 can add a Record gesture next to these without changing the file shape much.
+    // Persisted recording defaults
+    public bool RecordShowCursor { get; set; } = true;
+    public bool RecordMicAudio { get; set; }
+    public bool RecordSystemAudio { get; set; } = true;
+    public int RecordVideoFps { get; set; } = 30;
+    public int RecordGifFps { get; set; } = 12;
 
     public static AppSettings CreateDefault()
     {
@@ -65,6 +72,8 @@ public sealed class AppSettings
         CaptureAction.Scrolling => Scrolling,
         CaptureAction.Ocr => Ocr,
         CaptureAction.RepeatLastArea => RepeatLastArea,
+        CaptureAction.RecordVideo => RecordVideo,
+        CaptureAction.RecordGif => RecordGif,
         _ => Area
     };
 
@@ -78,6 +87,8 @@ public sealed class AppSettings
             case CaptureAction.Scrolling: Scrolling = gesture; break;
             case CaptureAction.Ocr: Ocr = gesture; break;
             case CaptureAction.RepeatLastArea: RepeatLastArea = gesture; break;
+            case CaptureAction.RecordVideo: RecordVideo = gesture; break;
+            case CaptureAction.RecordGif: RecordGif = gesture; break;
         }
     }
 
@@ -89,5 +100,7 @@ public sealed class AppSettings
         yield return (CaptureAction.Scrolling, Scrolling);
         yield return (CaptureAction.Ocr, Ocr);
         yield return (CaptureAction.RepeatLastArea, RepeatLastArea);
+        yield return (CaptureAction.RecordVideo, RecordVideo);
+        yield return (CaptureAction.RecordGif, RecordGif);
     }
 }
