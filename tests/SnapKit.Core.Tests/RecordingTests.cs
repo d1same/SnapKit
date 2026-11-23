@@ -135,4 +135,67 @@ public class RecordingTests
         Assert.True(nv12[64] < 110);
         Assert.True(nv12[65] > 200);
     }
+
+    [Fact]
+    public void Timed_annotation_fades_smoothly_and_clips_outside_window()
+    {
+        var timed = new TimedAnnotation
+        {
+            Annotation = new Annotation { Kind = AnnotationKind.Arrow, Points = new() { new(0, 0), new(50, 50) } },
+            StartSeconds = 2.0,
+            EndSeconds = 5.0,
+            FadeSeconds = 0.2
+        };
+
+        Assert.Equal(0, timed.OpacityAt(1.9));
+        Assert.Equal(0, timed.OpacityAt(5.1));
+        Assert.InRange(timed.OpacityAt(2.1), 0.3, 0.7);
+        Assert.Equal(1.0, timed.OpacityAt(3.5));
+        Assert.InRange(timed.OpacityAt(4.9), 0.3, 0.7);
+    }
+
+    [Fact]
+    public void Video_annotation_track_handles_steps_timing_trim_cache_keys_and_undo_redo()
+    {
+        var track = new VideoAnnotationTrack(10.0);
+        Assert.False(track.HasEdits);
+
+        var arrow = track.Add(new Annotation
+        {
+            Kind = AnnotationKind.Arrow,
+            Points = new() { new(10, 10), new(120, 80) },
+            ColorHex = "#FF3B30"
+        }, startSeconds: 1.0, durationSeconds: 3.0);
+
+        var step1 = track.Add(new Annotation
+        {
+            Kind = AnnotationKind.Number,
+            Points = new() { new(40, 40) }
+        }, startSeconds: 2.0, durationSeconds: 2.0);
+
+        Assert.True(track.HasEdits);
+        Assert.Equal(1, step1.Annotation.Number);
+        Assert.Equal(2, track.NextStepNumber);
+
+        // At t = 2.5s both arrow and step1 are active; cache key is constant across steady middle frames
+        Assert.Equal(2, track.ActiveAt(2.5).Count);
+        long keyA = track.OverlayCacheKeyAt(2.5);
+        long keyB = track.OverlayCacheKeyAt(3.0);
+        Assert.NotEqual(0, keyA);
+        Assert.Equal(keyA, keyB);
+
+        // Outside both windows cache key is 0
+        Assert.Equal(0, track.OverlayCacheKeyAt(8.0));
+
+        // Trim + Full clip + Undo/Redo
+        Assert.True(track.SetTrim(1.0, 8.0));
+        Assert.True(track.SetFullVideo(arrow.Id));
+        Assert.Equal(1.0, track.Find(arrow.Id)!.StartSeconds);
+        Assert.Equal(8.0, track.Find(arrow.Id)!.EndSeconds);
+
+        Assert.True(track.Undo());
+        Assert.Equal(4.0, track.Find(arrow.Id)!.EndSeconds);
+        Assert.True(track.Redo());
+        Assert.Equal(8.0, track.Find(arrow.Id)!.EndSeconds);
+    }
 }

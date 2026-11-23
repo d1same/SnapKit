@@ -66,27 +66,33 @@ internal sealed class RecordingDoneWindow : Window
             Margin = new Thickness(0, 10, 0, 0)
         };
 
-        var copyBtn = UiChrome.ActionButton("Copy file", CopyFile, ButtonTone.Primary, minWidth: 108);
+        var copyBtn = UiChrome.ActionButton("Copy file", CopyFile, ButtonTone.Primary, minWidth: 100);
         copyBtn.ToolTip = "Copy file to clipboard  (Ctrl+C)";
-        copyBtn.Margin = new Thickness(0, 0, 6, 0);
+        copyBtn.Margin = new Thickness(0, 0, 6, 6);
 
-        var quickBtn = UiChrome.ActionButton("Quick Save", QuickSave, ButtonTone.Secondary, minWidth: 96);
+        var annotateBtn = UiChrome.ActionButton("Annotate", OpenEditor, ButtonTone.Secondary, minWidth: 92);
+        annotateBtn.ToolTip = "Add timed arrows, callouts, steps, blur, or trim video  (E)";
+        annotateBtn.Margin = new Thickness(0, 0, 6, 6);
+
+        var quickBtn = UiChrome.ActionButton("Quick Save", QuickSave, ButtonTone.Secondary, minWidth: 92);
         quickBtn.ToolTip = "Save directly to your Quick Save folder  (Ctrl+Shift+S)";
-        quickBtn.Margin = new Thickness(0, 0, 6, 0);
+        quickBtn.Margin = new Thickness(0, 0, 6, 6);
 
-        var saveBtn = UiChrome.ActionButton("Save as…", SaveAs, ButtonTone.Secondary, minWidth: 86);
+        var saveBtn = UiChrome.ActionButton("Save as…", SaveAs, ButtonTone.Secondary, minWidth: 82);
         saveBtn.ToolTip = "Choose save location  (Ctrl+S)";
-        saveBtn.Margin = new Thickness(0, 0, 6, 0);
+        saveBtn.Margin = new Thickness(0, 0, 6, 6);
 
-        var playBtn = UiChrome.ActionButton("Play", OpenPreview, ButtonTone.Secondary, minWidth: 64);
+        var playBtn = UiChrome.ActionButton("Play", OpenPreview, ButtonTone.Secondary, minWidth: 58);
         playBtn.ToolTip = "Open in default player";
-        playBtn.Margin = new Thickness(0, 0, 6, 0);
+        playBtn.Margin = new Thickness(0, 0, 6, 6);
 
-        var closeBtn = UiChrome.ActionButton("Close", Close, ButtonTone.Ghost, minWidth: 60);
+        var closeBtn = UiChrome.ActionButton("Close", Close, ButtonTone.Ghost, minWidth: 58);
         closeBtn.ToolTip = "Close  (Esc)";
+        closeBtn.Margin = new Thickness(0, 0, 0, 6);
 
         var actions = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
         actions.Children.Add(copyBtn);
+        actions.Children.Add(annotateBtn);
         actions.Children.Add(quickBtn);
         actions.Children.Add(saveBtn);
         actions.Children.Add(playBtn);
@@ -107,6 +113,11 @@ internal sealed class RecordingDoneWindow : Window
                 Close();
                 e.Handled = true;
             }
+            else if (mods == ModifierKeys.None && e.Key == Key.E)
+            {
+                OpenEditor();
+                e.Handled = true;
+            }
             else if (mods == ModifierKeys.Control && e.Key == Key.C)
             {
                 CopyFile();
@@ -124,6 +135,22 @@ internal sealed class RecordingDoneWindow : Window
             }
         };
         SourceInitialized += (_, _) => WindowChrome.UseDarkTitle(this);
+    }
+
+    private void OpenEditor()
+    {
+        try
+        {
+            var editor = new VideoEditorWindow(_result, _state);
+            Close();
+            editor.Show();
+            editor.Activate();
+        }
+        catch (Exception ex)
+        {
+            _status.Foreground = Palette.Danger;
+            _status.Text = "Could not open video editor: " + ex.Message;
+        }
     }
 
     private void CopyFile()

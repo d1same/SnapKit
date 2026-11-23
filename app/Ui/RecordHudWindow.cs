@@ -26,10 +26,13 @@ internal sealed class RecordHudWindow : Window
     private readonly int _rawH;
     private readonly Action _onClosedAll;
     private readonly RecordFrameWindow _frameWindow;
+    private readonly LiveDrawOverlayWindow _drawOverlay;
     private readonly DispatcherTimer _timer;
 
     private readonly StackPanel _readyRow;
+    private readonly StackPanel _liveContainer;
     private readonly StackPanel _liveRow;
+    private readonly Border _drawBar;
     private readonly Border _mp4Chip;
     private readonly Border _gifChip;
     private readonly Border _cursorChip;
@@ -39,6 +42,10 @@ internal sealed class RecordHudWindow : Window
     private readonly Ellipse _liveDot;
     private readonly TextBlock _liveFormat;
     private readonly TextBlock _liveTime;
+    private readonly Border _drawToggleChip;
+    private readonly Border _fadeChip;
+    private readonly Dictionary<AnnotationKind, Border> _drawToolChips = new();
+    private readonly List<(string Hex, Border Swatch)> _drawSwatches = new();
     private readonly TextBlock _pauseLabel;
     private readonly Border _pauseChip;
     private readonly Border _stopChip;
@@ -85,6 +92,13 @@ internal sealed class RecordHudWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
 
         _frameWindow = new RecordFrameWindow(monitor, screenX, screenY, _rawW, _rawH);
+        _drawOverlay = new LiveDrawOverlayWindow(monitor, screenX, screenY, _rawW, _rawH)
+        {
+            ColorHex = HexColor.Normalize(state.Settings.LastColorHex, "#FF3B30"),
+            StrokeWidth = Math.Clamp(state.Settings.LastStroke, 2, 10),
+            AutoFade = true
+        };
+        _drawOverlay.ExitDrawRequested += () => SetLiveDraw(false);
 
         // ── Ready row (before recording starts) ────────────────────────────────
         _readyRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -179,8 +193,7 @@ internal sealed class RecordHudWindow : Window
         _liveRow = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-            Visibility = Visibility.Collapsed
+            VerticalAlignment = VerticalAlignment.Center
         };
         _liveDot = new Ellipse
         {
@@ -211,6 +224,13 @@ internal sealed class RecordHudWindow : Window
             VerticalAlignment = VerticalAlignment.Center
         };
 
+        _drawToggleChip = ToggleChip("✎ Draw", "Toggle live tutorial drawing over the recording area", () => SetLiveDraw(!_drawOverlay.IsDrawMode));
+        _drawToggleChip.Height = 28;
+        _drawToggleChip.Padding = new Thickness(9, 0, 9, 0);
+        _drawToggleChip.Margin = new Thickness(2, 0, 3, 0);
+        _drawToggleChip.BorderBrush = Palette.Line;
+        _drawToggleChip.BorderThickness = new Thickness(1);
+
         _pauseLabel = new TextBlock
         {
             Text = "Pause",
@@ -237,8 +257,80 @@ internal sealed class RecordHudWindow : Window
         _liveRow.Children.Add(_liveFormat);
         _liveRow.Children.Add(_liveTime);
         _liveRow.Children.Add(Hairline());
+        _liveRow.Children.Add(_drawToggleChip);
         _liveRow.Children.Add(_pauseChip);
         _liveRow.Children.Add(_stopChip);
+
+        // Live draw tool strip (shown beneath live row when Draw mode is active)
+        var drawRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var liveTools = new (AnnotationKind Kind, string Label, string Tip)[]
+        {
+            (AnnotationKind.Arrow, "↗", "Arrow"),
+            (AnnotationKind.Pen, "✎", "Pen"),
+            (AnnotationKind.Rectangle, "□", "Box"),
+            (AnnotationKind.Ellipse, "○", "Circle"),
+            (AnnotationKind.Highlighter, "▬", "Highlighter"),
+            (AnnotationKind.Number, "①", "Step #")
+        };
+        foreach (var (kind, glyph, tip) in liveTools)
+        {
+            var chip = ToggleChip(glyph, tip, () => SelectLiveTool(kind));
+            chip.Padding = new Thickness(7, 0, 7, 0);
+            _drawToolChips[kind] = chip;
+            drawRow.Children.Add(chip);
+        }
+        drawRow.Children.Add(Hairline());
+
+        foreach (var hex in new[] { "#FF3B30", "#F59E0B", "#22C55E", "#0A84FF", "#F2F2F2" })
+        {
+            string captured = hex;
+            var swatch = new Border
+            {
+                Width = 15,
+                Height = 15,
+                Margin = new Thickness(2, 0, 2, 0),
+                CornerRadius = new CornerRadius(8),
+                Background = Palette.Brush(captured),
+                BorderBrush = Palette.LineStrong,
+                BorderThickness = new Thickness(1),
+                Cursor = Cursors.Hand,
+                ToolTip = captured
+            };
+            swatch.MouseLeftButtonDown += (_, e) => e.Handled = true;
+            swatch.MouseLeftButtonUp += (_, e) => { e.Handled = true; SelectLiveColor(captured); };
+            _drawSwatches.Add((captured, swatch));
+            drawRow.Children.Add(swatch);
+        }
+        drawRow.Children.Add(Hairline());
+
+        _fadeChip = ToggleChip("Fade", "Auto-fade marks after 2.4s (turn off to keep marks on screen)", () =>
+        {
+            _drawOverlay.AutoFade = !_drawOverlay.AutoFade;
+            RefreshLiveDrawUi();
+        });
+        drawRow.Children.Add(_fadeChip);
+
+        var undoChip = ToggleChip("Undo", "Undo last mark", () => _drawOverlay.Undo());
+        var clearChip = ToggleChip("Clear", "Clear all marks on screen", () => _drawOverlay.Clear());
+        drawRow.Children.Add(undoChip);
+        drawRow.Children.Add(clearChip);
+
+        _drawBar = new Border
+        {
+            Margin = new Thickness(0, 6, 0, 0),
+            Padding = new Thickness(4, 5, 4, 2),
+            BorderBrush = Palette.Divider,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Visibility = Visibility.Collapsed,
+            Child = drawRow
+        };
+
+        _liveContainer = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Visibility = Visibility.Collapsed,
+            Children = { _liveRow, _drawBar }
+        };
 
         var pill = new Border
         {
@@ -256,7 +348,7 @@ internal sealed class RecordHudWindow : Window
                 Opacity = 0.5,
                 Color = Colors.Black
             },
-            Child = new Grid { Children = { _readyRow, _liveRow } }
+            Child = new Grid { Children = { _readyRow, _liveContainer } }
         };
         Content = pill;
 
@@ -294,6 +386,7 @@ internal sealed class RecordHudWindow : Window
         Closed += (_, _) =>
         {
             _timer.Stop();
+            _drawOverlay.SafeClose();
             _frameWindow.SafeClose();
             if (_recorder is { IsRecording: true })
             {
@@ -303,10 +396,12 @@ internal sealed class RecordHudWindow : Window
         };
 
         RefreshReadyState();
+        RefreshLiveDrawUi();
     }
 
     public void ShowWithFrame()
     {
+        _drawOverlay.Show();
         _frameWindow.Show();
         Show();
         Activate();
@@ -318,6 +413,43 @@ internal sealed class RecordHudWindow : Window
             _ = StopAndPresentAsync();
         else if (_recorder == null)
             CancelAndClose();
+    }
+
+    private void SetLiveDraw(bool enabled)
+    {
+        if (_recorder == null || _stopping)
+            return;
+        _drawOverlay.SetDrawMode(enabled);
+        _drawBar.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        RefreshLiveDrawUi();
+        // Keep HUD above the live draw canvas so Draw/Pause/Stop remain clickable at all times.
+        WindowChrome.SetTopmost(this, true);
+    }
+
+    private void SelectLiveTool(AnnotationKind kind)
+    {
+        _drawOverlay.ActiveTool = kind;
+        RefreshLiveDrawUi();
+    }
+
+    private void SelectLiveColor(string hex)
+    {
+        _drawOverlay.ColorHex = hex;
+        RefreshLiveDrawUi();
+    }
+
+    private void RefreshLiveDrawUi()
+    {
+        PaintToggle(_drawToggleChip, _drawOverlay.IsDrawMode);
+        PaintToggle(_fadeChip, _drawOverlay.AutoFade);
+        foreach (var (kind, chip) in _drawToolChips)
+            PaintToggle(chip, _drawOverlay.ActiveTool == kind);
+        foreach (var (hex, swatch) in _drawSwatches)
+        {
+            bool active = string.Equals(hex, _drawOverlay.ColorHex, StringComparison.OrdinalIgnoreCase);
+            swatch.BorderBrush = active ? Palette.TextBright : Palette.LineStrong;
+            swatch.BorderThickness = new Thickness(active ? 2 : 1);
+        }
     }
 
     private void SetFormat(RecordingFormat format)
@@ -374,7 +506,7 @@ internal sealed class RecordHudWindow : Window
             _recorder.Start(options, outPath);
 
             _readyRow.Visibility = Visibility.Collapsed;
-            _liveRow.Visibility = Visibility.Visible;
+            _liveContainer.Visibility = Visibility.Visible;
             _liveFormat.Text = _format == RecordingFormat.Gif ? "GIF" : "MP4";
             _liveTime.Text = "00:00";
             _frameWindow.SetRecordingState(recording: true, paused: false);
@@ -405,6 +537,7 @@ internal sealed class RecordHudWindow : Window
             return;
         _stopping = true;
         _timer.Stop();
+        _drawOverlay.SetDrawMode(false);
         _pauseChip.IsEnabled = false;
         _stopChip.IsEnabled = false;
         _stopLabel.Text = "Finishing…";
@@ -413,6 +546,7 @@ internal sealed class RecordHudWindow : Window
         {
             var result = await _recorder.StopAsync();
             _recorder = null;
+            _drawOverlay.SafeClose();
             _frameWindow.SafeClose();
             Close();
 
@@ -423,6 +557,7 @@ internal sealed class RecordHudWindow : Window
         catch (Exception ex)
         {
             _recorder = null;
+            _drawOverlay.SafeClose();
             _frameWindow.SafeClose();
             Close();
             _state.Tray?.Balloon(Brand.Name, "Recording failed: " + ex.Message);
