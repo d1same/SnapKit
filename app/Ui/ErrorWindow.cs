@@ -8,14 +8,15 @@ internal sealed class ErrorWindow : Window
     public ErrorWindow(string message)
     {
         Title = Brand.Name;
-        Width = 460;
-        Height = 280;
-        MinWidth = 320;
-        MinHeight = 200;
+        Width = 480;
+        Height = 300;
+        MinWidth = 340;
+        MinHeight = 220;
         Background = Palette.Bg;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ShowInTaskbar = true;
         Topmost = false;
+
         var box = new TextBox
         {
             Text = message,
@@ -26,34 +27,18 @@ internal sealed class ErrorWindow : Window
             Background = Palette.Field,
             Foreground = Palette.Text,
             BorderBrush = Palette.Line,
-            FontFamily = Palette.Font,
-            FontSize = 13,
-            Padding = new Thickness(10)
+            BorderThickness = new Thickness(1),
+            FontFamily = Palette.Mono,
+            FontSize = 12,
+            Padding = new Thickness(12, 10, 12, 10)
         };
-        var copy = new Button
-        {
-            Content = "Copy error",
-            Margin = new Thickness(0, 0, 8, 0),
-            Padding = new Thickness(12, 6, 12, 6),
-            Background = Palette.Text,
-            Foreground = Palette.Ink,
-            BorderThickness = new Thickness(0),
-            FontFamily = Palette.Font
-        };
-        copy.Click += (_, _) =>
+        var copy = UiChrome.ActionButton("Copy error", () =>
         {
             try { Clipboard.SetText(message); } catch { /* clipboard busy */ }
-        };
-        var close = new Button
-        {
-            Content = "Close",
-            Padding = new Thickness(12, 6, 12, 6),
-            Background = Palette.Elevated,
-            Foreground = Palette.Text,
-            BorderBrush = Palette.Line,
-            FontFamily = Palette.Font
-        };
-        close.Click += (_, _) => Close();
+        }, ButtonTone.Primary, minWidth: 108);
+        copy.Margin = new Thickness(0, 0, 8, 0);
+        var close = UiChrome.ActionButton("Close", Close, ButtonTone.Secondary, minWidth: 84);
+
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == System.Windows.Input.Key.Escape)
@@ -64,7 +49,7 @@ internal sealed class ErrorWindow : Window
         };
         Content = new DockPanel
         {
-            Margin = new Thickness(16),
+            Margin = new Thickness(18),
             LastChildFill = true,
             Children =
             {
@@ -75,7 +60,7 @@ internal sealed class ErrorWindow : Window
                     FontFamily = Palette.Font,
                     FontSize = 13,
                     TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 8)
+                    Margin = new Thickness(0, 0, 0, 10)
                 }, Dock.Top),
                 At(new StackPanel
                 {

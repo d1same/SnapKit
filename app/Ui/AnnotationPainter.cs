@@ -28,11 +28,13 @@ internal static class AnnotationPainter
                 DrawArrow(dc, annotation);
                 break;
             case AnnotationKind.Rectangle:
-                dc.DrawRectangle(null, Pen(annotation, 255), Box(annotation));
+                DrawShapeBox(dc, annotation, ellipse: false);
                 break;
             case AnnotationKind.Ellipse:
-                var rect = Box(annotation);
-                dc.DrawEllipse(null, Pen(annotation, 255), new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2), rect.Width / 2, rect.Height / 2);
+                DrawShapeBox(dc, annotation, ellipse: true);
+                break;
+            case AnnotationKind.Redact:
+                dc.DrawRectangle(fill, null, Box(annotation));
                 break;
             case AnnotationKind.Text:
                 if (!hideText)
@@ -45,6 +47,22 @@ internal static class AnnotationPainter
                 DrawNumber(dc, annotation, fill);
                 break;
         }
+    }
+
+    private static void DrawShapeBox(DrawingContext dc, Annotation annotation, bool ellipse)
+    {
+        var rect = Box(annotation);
+        Brush? fill = annotation.FillMode switch
+        {
+            ShapeFillMode.Tint => Palette.Brush(annotation.ColorHex, 0x3A),
+            ShapeFillMode.Solid => Palette.Brush(annotation.ColorHex, 255),
+            _ => null
+        };
+        Pen? pen = annotation.FillMode == ShapeFillMode.Solid ? null : Pen(annotation, 255);
+        if (ellipse)
+            dc.DrawEllipse(fill, pen, new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2), rect.Width / 2, rect.Height / 2);
+        else
+            dc.DrawRectangle(fill, pen, rect);
     }
 
     public static void DrawSpotlight(DrawingContext dc, ShotDocument document, Annotation? draft)

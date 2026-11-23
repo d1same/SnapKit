@@ -8,10 +8,10 @@ internal sealed class OcrWindow : Window
     public OcrWindow(string text, string? error = null)
     {
         Title = Brand.Name + " OCR";
-        Width = 440;
-        Height = 320;
-        MinWidth = 320;
-        MinHeight = 220;
+        Width = 480;
+        Height = 340;
+        MinWidth = 340;
+        MinHeight = 230;
         Background = Palette.Bg;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ShowInTaskbar = true;
@@ -26,7 +26,16 @@ internal sealed class OcrWindow : Window
         };
 
         var body = string.IsNullOrWhiteSpace(text) ? "" : text;
-        var status = error ?? (string.IsNullOrWhiteSpace(body) ? "No text found in that area." : "Copied to the clipboard.");
+        var status = error ?? (string.IsNullOrWhiteSpace(body) ? "No text found in that area." : "Copied to clipboard.");
+        var statusLabel = new TextBlock
+        {
+            Text = status,
+            Foreground = error == null ? Palette.Muted : Palette.Danger,
+            FontFamily = Palette.Font,
+            FontSize = 12.5,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
         var box = new TextBox
         {
             Text = string.IsNullOrWhiteSpace(body) ? status : body,
@@ -37,37 +46,13 @@ internal sealed class OcrWindow : Window
             Background = Palette.Field,
             Foreground = Palette.Text,
             BorderBrush = Palette.Line,
+            BorderThickness = new Thickness(1),
             CaretBrush = Palette.Text,
             FontFamily = Palette.Font,
-            FontSize = 14,
-            Padding = new Thickness(10),
+            FontSize = 13.5,
+            Padding = new Thickness(12, 10, 12, 10),
             MinHeight = 160
         };
-        var copy = new Button
-        {
-            Content = "Copy again",
-            Margin = new Thickness(0, 0, 8, 0),
-            Padding = new Thickness(12, 6, 12, 6),
-            Background = Palette.Text,
-            Foreground = Palette.Ink,
-            BorderThickness = new Thickness(0),
-            FontFamily = Palette.Font
-        };
-        copy.Click += (_, _) =>
-        {
-            if (!string.IsNullOrWhiteSpace(body))
-                Clipboard.SetText(body);
-        };
-        var close = new Button
-        {
-            Content = "Close",
-            Padding = new Thickness(12, 6, 12, 6),
-            Background = Palette.Elevated,
-            Foreground = Palette.Text,
-            BorderBrush = Palette.Line,
-            FontFamily = Palette.Font
-        };
-        close.Click += (_, _) => Close();
 
         var buttons = new StackPanel
         {
@@ -76,41 +61,43 @@ internal sealed class OcrWindow : Window
             Margin = new Thickness(0, 12, 0, 0)
         };
         if (!string.IsNullOrWhiteSpace(body))
+        {
+            var copy = UiChrome.ActionButton("Copy again", () =>
+            {
+                try
+                {
+                    Clipboard.SetText(body);
+                    statusLabel.Foreground = Palette.Success;
+                    statusLabel.Text = "Copied to clipboard.";
+                }
+                catch
+                {
+                    statusLabel.Foreground = Palette.Warning;
+                    statusLabel.Text = "Clipboard busy — try again.";
+                }
+            }, ButtonTone.Primary, minWidth: 108);
+            copy.Margin = new Thickness(0, 0, 8, 0);
             buttons.Children.Add(copy);
+        }
         if (!string.IsNullOrWhiteSpace(error))
         {
-            var copyError = new Button
-            {
-                Content = "Copy error",
-                Margin = new Thickness(0, 0, 8, 0),
-                Padding = new Thickness(12, 6, 12, 6),
-                Background = Palette.Text,
-                Foreground = Palette.Ink,
-                BorderThickness = new Thickness(0),
-                FontFamily = Palette.Font
-            };
             var errorText = error;
-            copyError.Click += (_, _) =>
+            var copyError = UiChrome.ActionButton("Copy error", () =>
             {
                 try { Clipboard.SetText(errorText); } catch { /* clipboard busy */ }
-            };
+            }, ButtonTone.Primary, minWidth: 108);
+            copyError.Margin = new Thickness(0, 0, 8, 0);
             buttons.Children.Add(copyError);
         }
-        buttons.Children.Add(close);
+        buttons.Children.Add(UiChrome.ActionButton("Close", Close, ButtonTone.Secondary, minWidth: 84));
+
         Content = new DockPanel
         {
-            Margin = new Thickness(16),
+            Margin = new Thickness(18),
             LastChildFill = true,
             Children =
             {
-                At(new TextBlock
-                {
-                    Text = status,
-                    Foreground = error == null ? Palette.Muted : Palette.Danger,
-                    FontFamily = Palette.Font,
-                    FontSize = 12,
-                    Margin = new Thickness(0, 0, 0, 8)
-                }, Dock.Top),
+                At(statusLabel, Dock.Top),
                 At(buttons, Dock.Bottom),
                 box
             }

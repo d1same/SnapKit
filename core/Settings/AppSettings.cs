@@ -1,5 +1,15 @@
 namespace SnapKit;
 
+public sealed class SavedRegion
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
+
+    public bool IsValid => Width >= SelectionAdjust.MinSize && Height >= SelectionAdjust.MinSize;
+}
+
 public sealed class AppSettings
 {
     public HotkeyGesture Area { get; set; } = new() { VirtualKey = 0x2C };
@@ -7,6 +17,7 @@ public sealed class AppSettings
     public HotkeyGesture FullScreen { get; set; } = new() { VirtualKey = 0x2C, Alt = true };
     public HotkeyGesture Scrolling { get; set; } = new() { VirtualKey = 0x2C, Ctrl = true, Shift = true };
     public HotkeyGesture Ocr { get; set; } = new() { VirtualKey = 0x4F, Ctrl = true, Shift = true };
+    public HotkeyGesture RepeatLastArea { get; set; } = new() { VirtualKey = 0x2C, Ctrl = true, Alt = true };
     public bool StartWithWindows { get; set; } = true;
 
     /// <summary>
@@ -17,6 +28,16 @@ public sealed class AppSettings
     public bool CaptureFlash { get; set; } = true;
     public bool ShutterSound { get; set; }
     public bool CloseOnClickAway { get; set; } = true;
+    public string QuickSaveFolder { get; set; } = "";
+    public SavedRegion? LastArea { get; set; }
+
+    // Persisted editor style defaults
+    public string LastTool { get; set; } = "Arrow";
+    public string LastColorHex { get; set; } = "#FF3B30";
+    public double LastStroke { get; set; } = 3;
+    public double LastFontSize { get; set; } = 18;
+    public ShapeFillMode LastFillMode { get; set; } = ShapeFillMode.Outline;
+    public BackdropPreset LastBackdrop { get; set; } = BackdropPreset.None;
 
     // v2 can add a Record gesture next to these without changing the file shape much.
 
@@ -43,6 +64,7 @@ public sealed class AppSettings
         CaptureAction.FullScreen => FullScreen,
         CaptureAction.Scrolling => Scrolling,
         CaptureAction.Ocr => Ocr,
+        CaptureAction.RepeatLastArea => RepeatLastArea,
         _ => Area
     };
 
@@ -55,6 +77,7 @@ public sealed class AppSettings
             case CaptureAction.FullScreen: FullScreen = gesture; break;
             case CaptureAction.Scrolling: Scrolling = gesture; break;
             case CaptureAction.Ocr: Ocr = gesture; break;
+            case CaptureAction.RepeatLastArea: RepeatLastArea = gesture; break;
         }
     }
 
@@ -65,5 +88,6 @@ public sealed class AppSettings
         yield return (CaptureAction.FullScreen, FullScreen);
         yield return (CaptureAction.Scrolling, Scrolling);
         yield return (CaptureAction.Ocr, Ocr);
+        yield return (CaptureAction.RepeatLastArea, RepeatLastArea);
     }
 }

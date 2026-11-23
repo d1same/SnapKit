@@ -136,4 +136,147 @@ public class DocumentTests
         Assert.Equal(10, end.X);
         Assert.Equal(10, end.Y);
     }
+
+    [Fact]
+    public void Clear_all_and_reset_step_support_undo()
+    {
+        var doc = new ShotDocument(new PixelBuffer(60, 60));
+        doc.AddAnnotation(new Annotation { Kind = AnnotationKind.Number, Points = { new PointD(5, 5) } });
+        doc.AddAnnotation(new Annotation { Kind = AnnotationKind.Number, Points = { new PointD(15, 15) } });
+        Assert.Equal(3, doc.NextNumber);
+
+        Assert.True(doc.ResetNumbering());
+        Assert.Equal(1, doc.NextNumber);
+        Assert.False(doc.ResetNumbering());
+
+        doc.Undo();
+        Assert.Equal(3, doc.NextNumber);
+
+        Assert.True(doc.ClearAnnotations());
+        Assert.Empty(doc.Annotations);
+        Assert.Equal(1, doc.NextNumber);
+
+        doc.Undo();
+        Assert.Equal(2, doc.Annotations.Count);
+        Assert.Equal(3, doc.NextNumber);
+    }
+
+    [Fact]
+    public void Duplicate_and_nudge_move_points_and_advance_step_numbers()
+    {
+        var doc = new ShotDocument(new PixelBuffer(80, 80));
+        var rect = new Annotation
+        {
+            Kind = AnnotationKind.Rectangle,
+            FillMode = ShapeFillMode.Tint,
+            Points = { new PointD(10, 10), new PointD(30, 25) }
+        };
+        doc.AddAnnotation(rect);
+
+        var copy = doc.DuplicateAnnotation(rect.Id, 16, 12);
+        Assert.NotNull(copy);
+        Assert.NotEqual(rect.Id, copy!.Id);
+        Assert.Equal(ShapeFillMode.Tint, copy.FillMode);
+        Assert.Equal(new PointD(26, 22), copy.Points[0]);
+        Assert.Equal(new PointD(46, 37), copy.Points[1]);
+
+        Assert.True(doc.NudgeAnnotation(copy.Id, -6, 3));
+        Assert.Equal(new PointD(20, 25), copy.Points[0]);
+        doc.Undo();
+        Assert.Equal(new PointD(26, 22), doc.Annotations[1].Points[0]);
+
+        var step = new Annotation { Kind = AnnotationKind.Number, Points = { new PointD(10, 10) } };
+        doc.AddAnnotation(step);
+        var stepCopy = doc.DuplicateAnnotation(step.Id, 10, 0);
+        Assert.NotNull(stepCopy);
+        Assert.Equal(1, step.Number);
+        Assert.Equal(2, stepCopy!.Number);
+    }
+
+    [Fact]
+    public void Redact_and_shape_fill_modes_restyle_properly()
+    {
+        var doc = new ShotDocument(new PixelBuffer(60, 60));
+        var box = new Annotation
+        {
+            Kind = AnnotationKind.Rectangle,
+            ColorHex = "#FF3B30",
+            FillMode = ShapeFillMode.Outline,
+            Points = { new PointD(4, 4), new PointD(24, 24) }
+        };
+        var redact = new Annotation
+        {
+            Kind = AnnotationKind.Redact,
+            ColorHex = "#1C1C1E",
+            Points = { new PointD(10, 10), new PointD(40, 20) }
+        };
+        doc.AddAnnotation(box);
+        doc.AddAnnotation(redact);
+
+        Assert.True(doc.Restyle(box.Id, null, null, null, ShapeFillMode.Tint));
+        Assert.Equal(ShapeFillMode.Tint, box.FillMode);
+        Assert.True(doc.Restyle(box.Id, null, null, null, ShapeFillMode.Solid));
+        Assert.Equal(ShapeFillMode.Solid, box.FillMode);
+        doc.Undo();
+        Assert.Equal(ShapeFillMode.Tint, doc.Annotations[0].FillMode);
+
+        Assert.True(doc.Restyle(redact.Id, "#0A84FF", 12, 32, ShapeFillMode.Solid));
+        Assert.Equal("#0A84FF", doc.Annotations[1].ColorHex);
+        Assert.Equal(3, doc.Annotations[1].Stroke);
+        Assert.Equal(ShapeFillMode.Outline, doc.Annotations[1].FillMode);
+    }
+
+    [Fact]
+    public void Backdrop_layout_and_document_undo_work()
+    {
+        var none = BackdropLayout.Measure(BackdropPreset.None, 400, 300);
+        Assert.Equal(400, none.TotalWidth);
+        Assert.Equal(300, none.TotalHeight);
+
+        var clean = BackdropLayout.Measure(BackdropPreset.Clean, 400, 300);
+        Assert.True(clean.TotalWidth > 400);
+        Assert.True(clean.TotalHeight > 300);
+        Assert.True(clean.PadX >= 24);
+        Assert.True(clean.CornerRadius >= 8);
+
+        var doc = new ShotDocument(new PixelBuffer(100, 80));
+        Assert.Equal(BackdropPreset.None, doc.Backdrop);
+        Assert.True(doc.SetBackdrop(BackdropPreset.Slate));
+        Assert.Equal(BackdropPreset.Slate, doc.Backdrop);
+        doc.Undo();
+        Assert.Equal(BackdropPreset.None, doc.Backdrop);
+        doc.Redo();
+        Assert.Equal(BackdropPreset.Slate, doc.Backdrop);
+    }
+
+    [Fact]
+    public void Annotation_handles_resize_endpoints_and_corners()
+    {
+        var arrow = new Annotation
+        {
+            Kind = AnnotationKind.Arrow,
+            Points = { new PointD(10, 10), new PointD(50, 10) }
+        };
+        var arrowHandles = AnnotationHandles.For(arrow);
+        Assert.Equal(2, arrowHandles.Count);
+        var anchor = AnnotationHandles.AnchorFor(arrow, AnnotationHandleKind.End);
+        AnnotationHandles.ApplyResize(arrow, AnnotationHandleKind.End, anchor, new PointD(60, 14), constrain: true);
+        Assert.Equal(new PointD(10, 10), arrow.Points[0]);
+        Assert.True(Math.Abs(arrow.Points[1].Y - 10) < 0.01);
+
+        var box = new Annotation
+        {
+            Kind = AnnotationKind.Redact,
+            Points = { new PointD(10, 20), new PointD(50, 60) }
+        };
+        var boxHandles = AnnotationHandles.For(box);
+        Assert.Equal(4, boxHandles.Count);
+        var nwAnchor = AnnotationHandles.AnchorFor(box, AnnotationHandleKind.NorthWest);
+        Assert.Equal(new PointD(50, 60), nwAnchor);
+        AnnotationHandles.ApplyResize(box, AnnotationHandleKind.NorthWest, nwAnchor, new PointD(20, 40), constrain: true);
+        var (x, y, w, h) = ShapeMath.Bounds(box.Points);
+        Assert.Equal(w, h, 2);
+        Assert.Equal(50, x + w, 2);
+        Assert.Equal(60, y + h, 2);
+    }
 }

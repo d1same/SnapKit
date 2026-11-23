@@ -6,23 +6,42 @@ namespace SnapKit;
 internal sealed class InstallWindow : Window
 {
     private readonly TextBlock _status;
+    private readonly TextBlock _percent;
+    private readonly ProgressBar _progress;
+    private readonly Action<Action<string, double?>> _work;
+    private bool _running = true;
 
-    public InstallWindow(bool updating)
+    private InstallWindow(bool updating, Action<Action<string, double?>> work)
     {
+        _work = work;
         Title = updating ? "Updating " + Brand.Name : "Installing " + Brand.Name;
-        Width = 440;
-        Height = 210;
+        Width = 460;
+        Height = 230;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ResizeMode = ResizeMode.NoResize;
         Topmost = true;
         ShowInTaskbar = true;
         Background = Palette.Bg;
 
+        var header = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        header.Children.Add(new TextBlock
+        {
+            Text = updating ? "Updating " + Brand.Name : "Installing " + Brand.Name,
+            Foreground = Palette.Text,
+            FontFamily = Palette.Font,
+            FontSize = 20,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        var pill = UiChrome.Pill("v" + ReleaseClient.Display, Palette.AccentSoft, Palette.Text, Palette.AccentLine, mono: true);
+        pill.Margin = new Thickness(10, 2, 0, 0);
+        header.Children.Add(pill);
+
         _status = new TextBlock
         {
             Text = updating
-                ? "Replacing the copy that sits beside the clock."
-                : "Copying SnapKit for this user. It will sit beside the clock and start with Windows.",
+                ? "Replacing the installed copy beside the clock…"
+                : "Installing for your account. SnapKit will sit beside the clock and start with Windows.",
             Foreground = Palette.Muted,
             FontFamily = Palette.Font,
             FontSize = 13,
@@ -30,52 +49,70 @@ internal sealed class InstallWindow : Window
             Margin = new Thickness(0, 10, 0, 0)
         };
 
-        Content = new StackPanel
+        _percent = new TextBlock
         {
-            Margin = new Thickness(24),
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = updating ? "Updating SnapKit" : "Installing SnapKit",
-                    Foreground = Palette.Text,
-                    FontFamily = Palette.Font,
-                    FontSize = 22,
-                    FontWeight = FontWeights.SemiBold
-                },
-                _status,
-                new ProgressBar
-                {
-                    IsIndeterminate = true,
-                    Height = 8,
-                    Margin = new Thickness(0, 20, 0, 0),
-                    Foreground = Palette.Text,
-                    Background = Palette.Elevated,
-                    BorderThickness = new Thickness(0)
-                }
-            }
+            Text = "",
+            Foreground = Palette.Subtle,
+            FontFamily = Palette.Mono,
+            FontSize = 11.5,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 14, 0, 5)
+        };
+
+        var barWrap = UiChrome.DarkProgress(out _progress);
+        _progress.IsIndeterminate = true;
+
+        var card = UiChrome.Card(new StackPanel
+        {
+            Children = { header, _status, _percent, barWrap }
+        }, new Thickness(20, 18, 20, 20));
+        card.Margin = new Thickness(14);
+        Content = card;
+
+        Closing += (_, e) =>
+        {
+            if (_running)
+                e.Cancel = true;
         };
         SourceInitialized += (_, _) => WindowChrome.UseDarkTitle(this);
+        Loaded += OnLoaded;
     }
 
-    public void SetStatus(string text) => _status.Text = text;
-
-    public static void Run(bool updating, Action<Action<string>> body)
+    private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        var window = new InstallWindow(updating);
-        window.Show();
-        Pump(window);
-        body(text =>
+        try
         {
-            window.SetStatus(text);
-            Pump(window);
-        });
-        Pump(window);
-        window.Close();
+            await Task.Run(() => _work(Report));
+        }
+        finally
+        {
+            _running = false;
+            Close();
+        }
     }
 
-    private static void Pump(Window window)
+    private void Report(string text, double? percent)
     {
-        window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+        Dispatcher.BeginInvoke(() =>
+        {
+            _status.Text = text;
+            if (percent.HasValue)
+            {
+                _progress.IsIndeterminate = false;
+                _progress.Value = Math.Clamp(percent.Value, 0, 100);
+                _percent.Text = $"{Math.Round(_progress.Value)}%";
+            }
+            else
+            {
+                _progress.IsIndeterminate = true;
+                _percent.Text = "";
+            }
+        });
+    }
+
+    public static void Run(bool updating, Action<Action<string, double?>> body)
+    {
+        var window = new InstallWindow(updating, body);
+        window.ShowDialog();
     }
 }

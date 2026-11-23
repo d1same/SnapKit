@@ -69,6 +69,42 @@ public class SettingsTests
         Assert.Equal("Alt+PrtSc", settings.FullScreen.Display);
         Assert.Equal("Ctrl+Shift+PrtSc", settings.Scrolling.Display);
         Assert.Equal("Ctrl+Shift+O", settings.Ocr.Display);
+        Assert.Equal("Ctrl+Alt+PrtSc", settings.RepeatLastArea.Display);
+    }
+
+    [Fact]
+    public void Roundtrip_keeps_persisted_style_defaults_and_last_area()
+    {
+        var settings = AppSettings.CreateDefault();
+        settings.LastTool = "Redact";
+        settings.LastColorHex = "#0A84FF";
+        settings.LastStroke = 8;
+        settings.LastFontSize = 24;
+        settings.LastFillMode = ShapeFillMode.Tint;
+        settings.LastBackdrop = BackdropPreset.Clean;
+        settings.QuickSaveFolder = @"C:\Docs\Shots";
+        settings.LastArea = new SavedRegion { X = 120, Y = 80, Width = 640, Height = 360 };
+
+        var path = Path.Combine(Path.GetTempPath(), "snapkit-style-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            SettingsStore.Save(settings, path);
+            var loaded = SettingsStore.Load(path);
+            Assert.Equal("Redact", loaded.LastTool);
+            Assert.Equal("#0A84FF", loaded.LastColorHex);
+            Assert.Equal(8, loaded.LastStroke);
+            Assert.Equal(24, loaded.LastFontSize);
+            Assert.Equal(ShapeFillMode.Tint, loaded.LastFillMode);
+            Assert.Equal(BackdropPreset.Clean, loaded.LastBackdrop);
+            Assert.Equal(@"C:\Docs\Shots", loaded.QuickSaveFolder);
+            Assert.NotNull(loaded.LastArea);
+            Assert.Equal(640, loaded.LastArea!.Width);
+            Assert.True(loaded.LastArea.IsValid);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

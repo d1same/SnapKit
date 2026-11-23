@@ -9,16 +9,18 @@ public sealed class ShotDocument
 
     public PixelBuffer Source { get; }
     public IntRect View { get; private set; }
+    public BackdropPreset Backdrop { get; private set; } = BackdropPreset.None;
     public IReadOnlyList<Annotation> Annotations => _annotations;
     public int NextNumber { get; private set; } = 1;
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
     public event Action? Changed;
 
-    public ShotDocument(PixelBuffer source, IntRect? view = null)
+    public ShotDocument(PixelBuffer source, IntRect? view = null, BackdropPreset backdrop = BackdropPreset.None)
     {
         Source = source;
         View = view?.Clamp(source.Width, source.Height, 2) ?? new IntRect(0, 0, source.Width, source.Height);
+        Backdrop = backdrop;
     }
 
     public void AddAnnotation(Annotation annotation)
@@ -38,7 +40,65 @@ public sealed class ShotDocument
 
     public void RemoveAnnotation(Guid id) => Commit(() => _annotations.RemoveAll(a => a.Id == id));
 
-    public bool Restyle(Guid id, string? colorHex, double? stroke, double? fontSize)
+    public bool ClearAnnotations()
+    {
+        if (_annotations.Count == 0 && NextNumber == 1)
+            return false;
+        Commit(() =>
+        {
+            _annotations.Clear();
+            NextNumber = 1;
+        });
+        return true;
+    }
+
+    public bool ResetNumbering()
+    {
+        if (NextNumber == 1)
+            return false;
+        Commit(() => NextNumber = 1);
+        return true;
+    }
+
+    public Annotation? DuplicateAnnotation(Guid id, double dx = 16, double dy = 16)
+    {
+        var original = _annotations.FirstOrDefault(item => item.Id == id);
+        if (original == null)
+            return null;
+        var copy = original.Clone();
+        copy.Id = Guid.NewGuid();
+        for (int i = 0; i < copy.Points.Count; i++)
+            copy.Points[i] = new PointD(copy.Points[i].X + dx, copy.Points[i].Y + dy);
+        if (copy.Kind == AnnotationKind.Number)
+            copy.Number = 0; // AddAnnotation assigns NextNumber++
+        AddAnnotation(copy);
+        return copy;
+    }
+
+    public bool NudgeAnnotation(Guid id, double dx, double dy)
+    {
+        if (Math.Abs(dx) < 0.001 && Math.Abs(dy) < 0.001)
+            return false;
+        var mark = _annotations.FirstOrDefault(item => item.Id == id);
+        if (mark == null || mark.Points.Count == 0)
+            return false;
+        Commit(() =>
+        {
+            for (int i = 0; i < mark.Points.Count; i++)
+                mark.Points[i] = new PointD(mark.Points[i].X + dx, mark.Points[i].Y + dy);
+        });
+        return true;
+    }
+
+    public bool SetBackdrop(BackdropPreset backdrop)
+    {
+        if (Backdrop == backdrop)
+            return false;
+        Commit(() => Backdrop = backdrop);
+        return true;
+    }
+
+    public bool Restyle(Guid id, string? colorHex, double? stroke, double? fontSize, ShapeFillMode? fillMode = null)
     {
         var mark = _annotations.FirstOrDefault(item => item.Id == id);
         if (mark == null)
@@ -47,6 +107,7 @@ public sealed class ShotDocument
         bool useColor = colorHex != null && mark.Kind != AnnotationKind.Blur;
         bool useStroke = stroke != null && mark.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur;
         bool useFont = fontSize != null && mark.Kind is AnnotationKind.Text or AnnotationKind.Callout or AnnotationKind.Number;
+        bool useFill = fillMode != null && mark.Kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse;
         string? nextColor = useColor ? HexColor.Normalize(colorHex, mark.ColorHex) : null;
         if (nextColor == mark.ColorHex)
             nextColor = null;
@@ -56,7 +117,8 @@ public sealed class ShotDocument
         double? nextFont = useFont ? Math.Clamp(fontSize!.Value, 8, 72) : null;
         if (nextFont != null && Math.Abs(nextFont.Value - mark.FontSize) < 0.01)
             nextFont = null;
-        if (nextColor == null && nextStroke == null && nextFont == null)
+        ShapeFillMode? nextFill = useFill && fillMode!.Value != mark.FillMode ? fillMode.Value : null;
+        if (nextColor == null && nextStroke == null && nextFont == null && nextFill == null)
             return false;
 
         Commit(() =>
@@ -67,6 +129,8 @@ public sealed class ShotDocument
                 mark.Stroke = nextStroke.Value;
             if (nextFont != null)
                 mark.FontSize = nextFont.Value;
+            if (nextFill != null)
+                mark.FillMode = nextFill.Value;
         });
         return true;
     }
@@ -180,6 +244,7 @@ public sealed class ShotDocument
     private Snapshot Capture() => new()
     {
         View = View,
+        Backdrop = Backdrop,
         Annotations = _annotations.Select(a => a.Clone()).ToList(),
         NextNumber = NextNumber
     };
@@ -187,6 +252,7 @@ public sealed class ShotDocument
     private void Restore(Snapshot snapshot)
     {
         View = snapshot.View;
+        Backdrop = snapshot.Backdrop;
         _annotations.Clear();
         _annotations.AddRange(snapshot.Annotations);
         NextNumber = snapshot.NextNumber;
@@ -195,6 +261,7 @@ public sealed class ShotDocument
     private sealed class Snapshot
     {
         public IntRect View { get; init; }
+        public BackdropPreset Backdrop { get; init; }
         public List<Annotation> Annotations { get; init; } = new();
         public int NextNumber { get; init; }
     }

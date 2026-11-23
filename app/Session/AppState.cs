@@ -21,4 +21,25 @@ internal sealed class AppState
         }
         return Hotkeys.RegisterAll();
     }
+
+    public void RememberLastArea(int x, int y, int width, int height)
+    {
+        if (width < SelectionAdjust.MinSize || height < SelectionAdjust.MinSize)
+            return;
+        Settings.LastArea = new SavedRegion
+        {
+            X = x,
+            Y = y,
+            Width = width,
+            Height = height
+        };
+        try
+        {
+            SettingsStore.Save(Settings);
+        }
+        catch
+        {
+            // Keep the region in memory even if settings.json is locked.
+        }
+    }
 }

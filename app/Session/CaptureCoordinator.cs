@@ -32,8 +32,13 @@ internal sealed class CaptureCoordinator
             case CaptureAction.Ocr:
                 _ = RunOverlay(OverlayMode.Area, OverlayPurpose.Ocr);
                 break;
+            case CaptureAction.RepeatLastArea:
+                _ = RunRepeatLastArea();
+                break;
         }
     }
+
+    public void StartRepeatLastArea() => _ = RunRepeatLastArea();
 
     public void StartAllMonitors() => _ = RunAllMonitors();
 
@@ -97,6 +102,7 @@ internal sealed class CaptureCoordinator
                 OcrFlow.Start(image, message => _state.Tray?.Balloon(Brand.Name, message), null, () => _state.Settings.CloseOnClickAway)));
             return;
         }
+        _state.RememberLastArea(pick.ScreenX, pick.ScreenY, pick.Image.Width, pick.Image.Height);
         InPlaceEditorWindow? editor = null;
         session.Dismissed += () =>
         {
@@ -130,6 +136,49 @@ internal sealed class CaptureCoordinator
         {
             session.CloseAll();
             _state.Tray?.Balloon(Brand.Name, ex.Message);
+        }
+    }
+
+    private async Task RunRepeatLastArea()
+    {
+        var region = _state.Settings.LastArea;
+        if (region == null || !region.IsValid)
+        {
+            _state.Tray?.Balloon(Brand.Name, "No previous area yet. Capture an area first.");
+            return;
+        }
+        if (_busy)
+            return;
+        _busy = true;
+        try
+        {
+            await PrepareScreenAsync();
+            var shots = ScreenGrabber.CaptureAll();
+            RestoreScreen();
+            if (shots.Count == 0)
+                throw new InvalidOperationException("No monitors were found.");
+
+            int centerX = region.X + region.Width / 2;
+            int centerY = region.Y + region.Height / 2;
+            var shot = shots.FirstOrDefault(item =>
+                centerX >= item.Monitor.X && centerX < item.Monitor.Right &&
+                centerY >= item.Monitor.Y && centerY < item.Monitor.Bottom)
+                ?? shots.FirstOrDefault(item => item.Monitor.Handle == MonitorQuery.UnderCursor().Handle)
+                ?? shots[0];
+
+            var local = new IntRect(region.X - shot.Monitor.X, region.Y - shot.Monitor.Y, region.Width, region.Height)
+                .Clamp(shot.Pixels.Width, shot.Pixels.Height, SelectionAdjust.MinSize);
+            Feedback(new[] { shot.Monitor });
+            var editor = InPlaceEditorWindow.Show(shot.Pixels, local, shot.Monitor.X, shot.Monitor.Y, shot.Monitor, _state, null);
+            editor.Activate();
+        }
+        catch (Exception ex)
+        {
+            _state.Tray?.Balloon(Brand.Name, ex.Message);
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 

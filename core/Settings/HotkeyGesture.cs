@@ -8,7 +8,8 @@ public enum CaptureAction
     Window,
     FullScreen,
     Scrolling,
-    Ocr
+    Ocr,
+    RepeatLastArea
 }
 
 public sealed class HotkeyGesture

@@ -22,6 +22,7 @@ internal sealed class InPlaceEditorWindow : Window
     private bool _discard;
     private int _placedW = -1;
     private int _placedH = -1;
+    private double _placedToolH = -1;
     private SelectionEdge? _adjust;
     private IntRect _adjustStart;
     private int _adjustScreenX;
@@ -61,13 +62,13 @@ internal sealed class InPlaceEditorWindow : Window
             _canvas.Children.Add(handle);
         _canvas.Children.Add(_toolbar);
         Content = _canvas;
-        session.Document.Changed += () => Dispatcher.BeginInvoke(PlaceIfViewChanged);
+        session.Document.Changed += () => Dispatcher.BeginInvoke(PlaceIfNeeded);
         SourceInitialized += (_, _) =>
         {
             Place();
             Opacity = 1;
         };
-        PreviewKeyDown += (_, e) => EditorKeys.Handle(e, _session, _surface, Discard, null);
+        PreviewKeyDown += (_, e) => EditorKeys.Handle(e, _session, _surface, Discard);
         ClickAway.Attach(this, Discard, () => _session.State.Settings.CloseOnClickAway);
         _session.Delivered += () => Dispatcher.BeginInvoke(Discard);
         PreviewMouseLeftButtonDown += OnAdjustDown;
@@ -86,7 +87,7 @@ internal sealed class InPlaceEditorWindow : Window
             }
             FinishAdjust(null);
         };
-        _session.Flash("Drag a corner to resize. Drag the edge to move it.");
+        _session.Flash("Drag a corner to resize · Drag edge to move · Copy copies & closes");
         Closed += (_, _) =>
         {
             if (!_discard)
@@ -101,7 +102,7 @@ internal sealed class InPlaceEditorWindow : Window
 
     public static InPlaceEditorWindow Show(PixelBuffer source, IntRect view, int sourceScreenX, int sourceScreenY, MonitorInfo monitor, AppState state, Action<IntRect>? reframe)
     {
-        var document = new ShotDocument(source, view);
+        var document = new ShotDocument(source, view, state.Settings.LastBackdrop);
         var recent = state.Recent.Add(document.ComposeUnderlay());
         var session = new EditorSession(document, recent, state);
         var window = new InPlaceEditorWindow(session, monitor, sourceScreenX, sourceScreenY, reframe);
@@ -142,20 +143,43 @@ internal sealed class InPlaceEditorWindow : Window
             _surface.FontSize = size;
             _surface.RestyleSelection(null, null, size);
         };
+        _toolbar.FillModePicked += mode =>
+        {
+            _session.SetFillMode(mode);
+            _surface.FillMode = mode;
+            _surface.RestyleSelection(null, null, null, mode);
+        };
+        _toolbar.BackdropPicked += preset => _session.SetBackdrop(preset);
         _surface.ColorPicked += hex =>
         {
             _session.SetColor(hex);
             _surface.ColorHex = _session.ColorHex;
         };
+        _surface.SelectionChanged += mark => _session.SetSelectedKind(mark?.Kind);
         _toolbar.UndoClicked += () => _session.Document.Undo();
         _toolbar.RedoClicked += () => _session.Document.Redo();
+        _toolbar.ClearAllClicked += () =>
+        {
+            _surface.CommitEditing();
+            _session.ClearAll();
+        };
+        _toolbar.ResetStepClicked += () => _session.ResetStep();
         ShotMenu.Attach(_surface, _surface, _session, this);
         _toolbar.CopyClicked += () =>
         {
             _surface.CommitEditing();
             _session.Copy();
         };
-        _toolbar.SaveClicked += () => _session.Save(this);
+        _toolbar.SaveClicked += () =>
+        {
+            _surface.CommitEditing();
+            _session.Save(this);
+        };
+        _toolbar.QuickSaveClicked += () =>
+        {
+            _surface.CommitEditing();
+            _session.QuickSave();
+        };
         _toolbar.OcrClicked += () =>
         {
             _surface.CommitEditing();
@@ -171,12 +195,25 @@ internal sealed class InPlaceEditorWindow : Window
         _surface.ColorHex = _session.ColorHex;
         _surface.StrokeWidth = _session.Stroke;
         _surface.FontSize = _session.FontSize;
+        _surface.FillMode = _session.FillMode;
         _toolbar.Sync(_session);
+        if (_placedW > 0)
+            Dispatcher.BeginInvoke(PlaceIfNeeded);
     }
 
-    private void PlaceIfViewChanged()
+    private void PlaceIfNeeded()
     {
-        if (_session.Document.View.Width != _placedW || _session.Document.View.Height != _placedH)
+        if (!IsVisible && _placedW < 0)
+            return;
+        double scale = _monitor.Scale <= 0 ? 1 : _monitor.Scale;
+        double maxDip = Math.Max(_session.Document.View.Width / scale, 640);
+        maxDip = Math.Min(maxDip, Math.Max(320, (_monitor.Width - 24) / scale));
+        _toolbar.MaxWidth = maxDip;
+        _toolbar.Measure(new Size(maxDip, double.PositiveInfinity));
+        bool sizeChanged = _session.Document.View.Width != _placedW
+            || _session.Document.View.Height != _placedH
+            || Math.Abs(_toolbar.DesiredSize.Height - _placedToolH) > 2;
+        if (sizeChanged)
             Place();
     }
 
@@ -190,24 +227,27 @@ internal sealed class InPlaceEditorWindow : Window
 
         _surface.SetPixelScale(scale);
 
-        double maxDip = Math.Max(imgW / scale, 280);
+        double maxDip = Math.Max(imgW / scale, 640);
+        maxDip = Math.Min(maxDip, Math.Max(320, (_monitor.Width - 24) / scale));
         _toolbar.MaxWidth = maxDip;
         _toolbar.Measure(new Size(maxDip, double.PositiveInfinity));
+        _placedToolH = _toolbar.DesiredSize.Height;
+        int gapPx = (int)Math.Ceiling(8 * scale);
         int toolW = Math.Max(1, (int)Math.Ceiling(_toolbar.DesiredSize.Width * scale));
         int toolH = Math.Max(40, (int)Math.Ceiling(_toolbar.DesiredSize.Height * scale));
 
         int screenX = _originX + _session.Document.View.X;
         int screenY = _originY + _session.Document.View.Y;
-        bool roomBelow = _monitor.Bottom - (screenY + imgH) >= toolH;
-        bool roomAbove = screenY - _monitor.Y >= toolH;
+        bool roomBelow = _monitor.Bottom - (screenY + imgH) >= toolH + gapPx;
+        bool roomAbove = screenY - _monitor.Y >= toolH + gapPx;
         bool below = roomBelow || !roomAbove;
 
         int contentW = Math.Max(imgW, toolW);
-        int contentH = imgH + toolH;
+        int contentH = imgH + toolH + gapPx;
         int winW = Math.Min(contentW, _monitor.Width);
         int winH = Math.Min(contentH, _monitor.Height);
         int winX = screenX;
-        int winY = below ? screenY : screenY - toolH;
+        int winY = below ? screenY : screenY - toolH - gapPx;
         if (winX + winW > _monitor.Right)
             winX = _monitor.Right - winW;
         if (winY + winH > _monitor.Bottom)
@@ -230,9 +270,11 @@ internal sealed class InPlaceEditorWindow : Window
         PlaceHandles(imageLeft, imageTop, imageWidth, imageHeight);
 
         double toolX = imageX / scale;
+        if (toolX + _toolbar.DesiredSize.Width > winW / scale)
+            toolX = Math.Max(0, winW / scale - _toolbar.DesiredSize.Width);
         double toolY = below
-            ? (imageY + imgH) / scale
-            : imageY / scale - _toolbar.DesiredSize.Height;
+            ? (imageY + imgH + gapPx) / scale
+            : imageY / scale - _toolbar.DesiredSize.Height - gapPx / scale;
         if (toolY < 0)
             toolY = Math.Max(0, winH / scale - _toolbar.DesiredSize.Height);
         if (toolY + _toolbar.DesiredSize.Height > winH / scale)
@@ -266,9 +308,10 @@ internal sealed class InPlaceEditorWindow : Window
     {
         Width = 12,
         Height = 12,
+        CornerRadius = new CornerRadius(3),
         Background = Brushes.White,
-        BorderBrush = Brushes.Black,
-        BorderThickness = new Thickness(1),
+        BorderBrush = Palette.Accent,
+        BorderThickness = new Thickness(1.5),
         IsHitTestVisible = false,
         SnapsToDevicePixels = true
     };
@@ -310,6 +353,7 @@ internal sealed class InPlaceEditorWindow : Window
             _session.Document.Source.Width,
             _session.Document.Source.Height);
         _session.Document.PreviewView(next);
+        _toolbar.Sync(_session);
         _reframe?.Invoke(_session.Document.View);
     }
 
@@ -327,6 +371,8 @@ internal sealed class InPlaceEditorWindow : Window
         if (IsMouseCaptured)
             ReleaseMouseCapture();
         _session.Document.EndEdit(changed);
+        if (changed)
+            _session.State.RememberLastArea(_originX + _session.Document.View.X, _originY + _session.Document.View.Y, _session.Document.View.Width, _session.Document.View.Height);
         _reframe?.Invoke(_session.Document.View);
     }
 
@@ -395,9 +441,10 @@ internal sealed class InPlaceEditorWindow : Window
     {
         try
         {
+            _surface.CommitEditing();
             var bitmap = _session.Render();
             _session.Remember();
-            new PinnedWindow(bitmap).Show();
+            new PinnedWindow(bitmap, _session.State).Show();
             _discard = true;
             Close();
         }
@@ -406,5 +453,4 @@ internal sealed class InPlaceEditorWindow : Window
             _session.State.Tray?.Balloon(Brand.Name, ex.Message);
         }
     }
-
 }

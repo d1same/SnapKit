@@ -12,11 +12,28 @@ internal static class ShotMenu
         {
             surface.CommitEditing();
             owner.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(session.Copy));
-        }));
+        }, "Ctrl+C"));
+        menu.Items.Add(DarkMenu.Item("Quick save", () =>
+        {
+            surface.CommitEditing();
+            owner.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => session.QuickSave()));
+        }, "Ctrl+Shift+S"));
         menu.Items.Add(DarkMenu.Item("Save as…", () =>
         {
             surface.CommitEditing();
             session.Save(owner);
+        }, "Ctrl+S"));
+        menu.Items.Add(DarkMenu.Separator());
+        menu.Items.Add(DarkMenu.Item("Duplicate selected", () =>
+        {
+            surface.CommitEditing();
+            if (surface.DuplicateSelection())
+                session.Flash("Duplicated selection.");
+        }, "Ctrl+D"));
+        menu.Items.Add(DarkMenu.Item("Clear all marks", () =>
+        {
+            surface.CommitEditing();
+            session.ClearAll();
         }));
         IDisposable? pause = null;
         menu.Opened += (_, _) =>
@@ -31,5 +48,4 @@ internal static class ShotMenu
         };
         host.ContextMenu = menu;
     }
-
 }

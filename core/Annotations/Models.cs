@@ -12,7 +12,42 @@ public enum AnnotationKind
     Callout,
     Number,
     Blur,
+    Redact,
     Spotlight
+}
+
+public enum ShapeFillMode
+{
+    Outline,
+    Tint,
+    Solid
+}
+
+public enum BackdropPreset
+{
+    None,
+    Clean,
+    Dark,
+    Slate
+}
+
+public readonly record struct BackdropMetrics(int PadX, int PadTop, int PadBottom, int CornerRadius, int TotalWidth, int TotalHeight);
+
+public static class BackdropLayout
+{
+    public static BackdropMetrics Measure(BackdropPreset preset, int width, int height)
+    {
+        int w = Math.Max(1, width);
+        int h = Math.Max(1, height);
+        if (preset == BackdropPreset.None)
+            return new BackdropMetrics(0, 0, 0, 0, w, h);
+
+        int padX = Math.Clamp((int)Math.Round(Math.Min(w, h) * 0.08), 24, 48);
+        int padTop = Math.Clamp((int)Math.Round(padX * 0.85), 20, 42);
+        int padBottom = padX + 6;
+        int radius = Math.Clamp((int)Math.Round(Math.Min(w, h) * 0.025), 8, 14);
+        return new BackdropMetrics(padX, padTop, padBottom, radius, w + padX * 2, h + padTop + padBottom);
+    }
 }
 
 public readonly record struct PointD(double X, double Y);
@@ -58,6 +93,7 @@ public sealed class Annotation
     public string Text { get; set; } = "";
     public int Number { get; set; }
     public double FontSize { get; set; } = 18;
+    public ShapeFillMode FillMode { get; set; } = ShapeFillMode.Outline;
 
     public Annotation Clone() => new()
     {
@@ -68,6 +104,7 @@ public sealed class Annotation
         Stroke = Stroke,
         Text = Text,
         Number = Number,
-        FontSize = FontSize
+        FontSize = FontSize,
+        FillMode = FillMode
     };
 }

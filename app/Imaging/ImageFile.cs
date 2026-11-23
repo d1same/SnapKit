@@ -202,4 +202,26 @@ internal static class ImageFile
             owner.Topmost = wasTopmost;
         }
     }
+
+    public static string DefaultQuickSaveFolder =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), Brand.Name);
+
+    public static string ResolveQuickSaveFolder(string? customFolder) =>
+        string.IsNullOrWhiteSpace(customFolder) ? DefaultQuickSaveFolder : customFolder.Trim();
+
+    public static string QuickSave(BitmapSource image, string? customFolder = null)
+    {
+        string folder = ResolveQuickSaveFolder(customFolder);
+        Directory.CreateDirectory(folder);
+        string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        string path = Path.Combine(folder, $"{Brand.Name}-{stamp}.png");
+        for (int n = 2; File.Exists(path); n++)
+            path = Path.Combine(folder, $"{Brand.Name}-{stamp}-{n}.png");
+
+        using var stream = File.Create(path);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(image));
+        encoder.Save(stream);
+        return path;
+    }
 }

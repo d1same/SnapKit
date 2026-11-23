@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace SnapKit;
 
@@ -7,7 +8,8 @@ public static class SettingsStore
     private static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() }
     };
 
     public static string DirectoryPath =>
@@ -24,6 +26,11 @@ public static class SettingsStore
             if (!File.Exists(path))
                 return AppSettings.CreateDefault();
             var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Json) ?? AppSettings.CreateDefault();
+            settings.LastColorHex = HexColor.Normalize(settings.LastColorHex, "#FF3B30");
+            settings.LastStroke = Math.Clamp(settings.LastStroke <= 0 ? 3 : settings.LastStroke, 1, 16);
+            settings.LastFontSize = Math.Clamp(settings.LastFontSize <= 0 ? 18 : settings.LastFontSize, 8, 72);
+            settings.QuickSaveFolder ??= "";
+            settings.LastTool = string.IsNullOrWhiteSpace(settings.LastTool) ? "Arrow" : settings.LastTool;
             if (AppSettings.ApplyStartupDefault(settings))
             {
                 try

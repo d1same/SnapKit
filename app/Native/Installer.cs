@@ -32,17 +32,17 @@ internal static class Installer
         string? error = null;
         InstallWindow.Run(updating, report =>
         {
-            report(updating ? "Closing the copy that is already running…" : "Preparing the install folder…");
+            report(updating ? "Closing the running copy…" : "Preparing the install folder…", 15);
             Directory.CreateDirectory(DirectoryPath);
             StopOtherCopies();
-            report("Copying SnapKit…");
+            report("Copying " + Brand.Name + "…", 45);
             if (!TryReplace(current, ExePath))
             {
                 error = "The installed " + Brand.Name + " file is still locked. End " + Brand.Name + " in Task Manager, then run this file again.";
                 return;
             }
 
-            report("Adding the Start menu shortcut…");
+            report("Creating Start menu shortcut…", 80);
             try
             {
                 CreateShortcut(ShortcutPath, ExePath);
@@ -53,7 +53,8 @@ internal static class Installer
                 // The copy is in place. Shortcuts can be repaired by running the file again.
             }
 
-            report(updating ? "Starting the updated SnapKit…" : "Starting SnapKit…");
+            report(updating ? "Launching updated " + Brand.Name + "…" : "Launching " + Brand.Name + "…", 100);
+            Thread.Sleep(220);
         });
 
         if (error != null)

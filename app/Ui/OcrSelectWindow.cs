@@ -77,34 +77,41 @@ internal sealed class OcrSelectWindow : Window
         {
             Text = page.Words.Count == 0
                 ? "No text found in that area."
-                : "Drag across the highlighted words. Esc closes.",
+                : $"{page.Words.Count} {(page.Words.Count == 1 ? "word" : "words")} found  ·  Drag across words to copy  ·  Ctrl+A copies all  ·  Esc closes",
             Foreground = Palette.Muted,
             FontFamily = Palette.Font,
-            FontSize = 13,
+            FontSize = 12.5,
+            TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(12, 0, 12, 0)
+            Margin = new Thickness(14, 0, 14, 0)
         };
-        var copyAll = Button("Copy all", CopyAll);
-        var close = Button("Close", Close);
-        close.Background = Palette.Elevated;
-        close.Foreground = Palette.Text;
-        close.BorderBrush = Palette.Line;
-        close.BorderThickness = new Thickness(1);
+        var copyAll = UiChrome.ActionButton("Copy all", CopyAll, ButtonTone.Primary, minWidth: 96);
+        copyAll.Margin = new Thickness(0, 0, 8, 0);
+        var close = UiChrome.ActionButton("Close", Close, ButtonTone.Secondary, minWidth: 78);
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 10, 0)
+            Margin = new Thickness(0, 0, 12, 0)
         };
         if (!string.IsNullOrWhiteSpace(page.Text) || page.Words.Count > 0)
             buttons.Children.Add(copyAll);
         buttons.Children.Add(close);
-        var bar = new Grid
+        var barGrid = new Grid();
+        barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(_status, 0);
+        Grid.SetColumn(buttons, 1);
+        barGrid.Children.Add(_status);
+        barGrid.Children.Add(buttons);
+        var bar = new Border
         {
             Height = 52,
             Background = Palette.Card,
-            Children = { _status, buttons }
+            BorderBrush = Palette.Line,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Child = barGrid
         };
 
         Content = new DockPanel
@@ -355,23 +362,6 @@ internal sealed class OcrSelectWindow : Window
     {
         string text = string.IsNullOrWhiteSpace(_page.Text) ? _page.TextFor(Enumerable.Range(0, _page.Words.Count)) : _page.Text;
         CopySelection(text);
-    }
-
-    private static Button Button(string label, Action click)
-    {
-        var button = new Button
-        {
-            Content = label,
-            Margin = new Thickness(0, 0, 8, 0),
-            Padding = new Thickness(12, 6, 12, 6),
-            Background = Palette.Text,
-            Foreground = Palette.Ink,
-            BorderThickness = new Thickness(0),
-            FontFamily = Palette.Font,
-            Cursor = Cursors.Hand
-        };
-        button.Click += (_, _) => click();
-        return button;
     }
 
     private static UIElement At(UIElement element, Dock dock)

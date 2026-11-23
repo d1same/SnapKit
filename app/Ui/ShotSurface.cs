@@ -15,6 +15,9 @@ internal sealed class ShotSurface : Grid
     private Annotation? _draft;
     private Annotation? _editing;
     private Annotation? _moving;
+    private Annotation? _resizing;
+    private AnnotationHandleKind _resizeHandle;
+    private PointD _resizeAnchor;
     private List<PointD>? _moveFrom;
     private PointD _press;
     private bool _editIsNew;
@@ -52,8 +55,12 @@ internal sealed class ShotSurface : Grid
     public string ColorHex { get; set; } = "#FF3B30";
     public double StrokeWidth { get; set; } = 3;
     public double FontSize { get; set; } = 18;
+    public ShapeFillMode FillMode { get; set; } = ShapeFillMode.Outline;
     public bool IsEditingText => _editing != null;
+    public bool HasSelection => SelectedAnnotation != null;
+    public Annotation? SelectedAnnotation => _selected == null ? null : Document.Annotations.FirstOrDefault(a => a.Id == _selected.Value);
     public event Action<string>? ColorPicked;
+    public event Action<Annotation?>? SelectionChanged;
 
     public void SetPixelScale(double scale)
     {
@@ -63,7 +70,7 @@ internal sealed class ShotSurface : Grid
 
     public void CommitEditing()
     {
-        if (_draft != null || _moving != null)
+        if (_draft != null || _moving != null || _resizing != null)
             FinishDrag(cancel: false);
         CommitText();
     }
@@ -88,15 +95,34 @@ internal sealed class ShotSurface : Grid
         if (_selected == null)
             return;
         var id = _selected.Value;
-        _selected = null;
+        SetSelected(null);
         Document.RemoveAnnotation(id);
     }
 
-    public void RestyleSelection(string? color, double? stroke, double? font)
+    public bool DuplicateSelection()
+    {
+        if (_selected == null)
+            return false;
+        CommitEditing();
+        var copy = Document.DuplicateAnnotation(_selected.Value, 16, 16);
+        if (copy == null)
+            return false;
+        SetSelected(copy.Id);
+        return true;
+    }
+
+    public bool NudgeSelection(double dx, double dy)
+    {
+        if (_selected == null)
+            return false;
+        return Document.NudgeAnnotation(_selected.Value, dx, dy);
+    }
+
+    public void RestyleSelection(string? color, double? stroke, double? font, ShapeFillMode? fillMode = null)
     {
         if (_editing != null && _editIsNew)
         {
-            ApplyLive(_editing, color, stroke, font);
+            ApplyLive(_editing, color, stroke, font, fillMode);
             RefreshEditorInk();
             PositionTextBox();
             _paint.InvalidateVisual();
@@ -106,16 +132,27 @@ internal sealed class ShotSurface : Grid
         var id = _selected ?? _editing?.Id;
         if (id == null)
             return;
-        if (!Document.Restyle(id.Value, color, stroke, font))
+        if (!Document.Restyle(id.Value, color, stroke, font, fillMode))
             return;
         RefreshEditorInk();
         PositionTextBox();
+    }
+
+    private void SetSelected(Guid? id)
+    {
+        if (_selected == id)
+            return;
+        _selected = id;
+        SelectionChanged?.Invoke(SelectedAnnotation);
+        _paint.InvalidateVisual();
     }
 
     private void OnDocumentChanged()
     {
         Width = Math.Max(1, Document.View.Width / PixelScale);
         Height = Math.Max(1, Document.View.Height / PixelScale);
+        if (_selected != null && SelectedAnnotation == null)
+            SetSelected(null);
         RefreshImage(force: false);
         PositionTextBox();
         _paint.InvalidateVisual();
@@ -146,7 +183,12 @@ internal sealed class ShotSurface : Grid
                 DrawSelection(dc, annotation);
         }
         if (_draft != null)
-            AnnotationPainter.Draw(dc, _draft, _editing != null && _draft.Id == _editing.Id);
+        {
+            if (_draft.Kind == AnnotationKind.Blur || _cropping)
+                DrawDraftBox(dc, _draft, _cropping ? Palette.Accent : Brushes.White);
+            else
+                AnnotationPainter.Draw(dc, _draft, _editing != null && _draft.Id == _editing.Id);
+        }
         if (_editing != null && _editIsNew)
             AnnotationPainter.Draw(dc, _editing, hideText: true);
         AnnotationPainter.DrawSpotlight(dc, Document, _draft);
@@ -154,19 +196,63 @@ internal sealed class ShotSurface : Grid
         dc.Pop();
     }
 
-    private static void DrawSelection(DrawingContext dc, Annotation annotation)
+    private void DrawDraftBox(DrawingContext dc, Annotation draft, Brush stroke)
     {
-        var rect = annotation.Kind == AnnotationKind.Callout
-            ? AnnotationPainter.Bubble(annotation, out _)
-            : AnnotationPainter.Box(annotation);
-        var pen = new Pen(Brushes.White, 1) { DashStyle = DashStyles.Dash };
+        var rect = AnnotationPainter.Box(draft);
+        double thickness = Math.Max(1, 1.5 * PixelScale);
+        var halo = new Pen(Palette.Freeze(0, 0, 0, 0xB0), thickness + 1 * PixelScale);
+        halo.Freeze();
+        var pen = new Pen(stroke, thickness) { DashStyle = new DashStyle(new[] { 4d, 3d }, 0) };
+        pen.Freeze();
+        dc.DrawRectangle(Palette.Freeze(10, 132, 255, 0x16), halo, rect);
         dc.DrawRectangle(null, pen, rect);
+    }
+
+    private void DrawSelection(DrawingContext dc, Annotation annotation)
+    {
+        double scale = Math.Max(0.5, PixelScale);
+        if (annotation.Kind is not (AnnotationKind.Line or AnnotationKind.Arrow))
+        {
+            var rect = annotation.Kind == AnnotationKind.Callout
+                ? AnnotationPainter.Bubble(annotation, out _)
+                : AnnotationPainter.Box(annotation);
+            if (annotation.Kind == AnnotationKind.Text)
+                rect = new Rect(rect.X, rect.Y, Math.Max(rect.Width, Math.Max(24, annotation.Text.Length * annotation.FontSize * 0.55)), Math.Max(rect.Height, annotation.FontSize * 1.4));
+            else if (annotation.Kind == AnnotationKind.Number)
+            {
+                double r = Math.Max(12, annotation.FontSize * 0.72) + 3;
+                rect = new Rect(annotation.Points[0].X - r, annotation.Points[0].Y - r, r * 2, r * 2);
+            }
+            var halo = new Pen(Palette.Freeze(0, 0, 0, 0x99), 2.2 * scale);
+            halo.Freeze();
+            var dash = new Pen(Palette.Accent, 1.25 * scale) { DashStyle = new DashStyle(new[] { 4d, 3d }, 0) };
+            dash.Freeze();
+            dc.DrawRectangle(null, halo, rect);
+            dc.DrawRectangle(null, dash, rect);
+        }
+
+        var handles = AnnotationHandles.For(annotation);
+        if (handles.Count == 0)
+            return;
+
+        double radius = 4.6 * scale;
+        var ring = new Pen(Palette.Accent, 1.8 * scale);
+        ring.Freeze();
+        var outer = new Pen(Palette.Freeze(0, 0, 0, 0x80), 3.0 * scale);
+        outer.Freeze();
+        foreach (var handle in handles)
+        {
+            var pt = new Point(handle.Position.X, handle.Position.Y);
+            dc.DrawEllipse(null, outer, pt, radius, radius);
+            dc.DrawEllipse(Brushes.White, ring, pt, radius, radius);
+        }
     }
 
     private void OnDown(object sender, MouseButtonEventArgs e)
     {
         Focus();
         var point = ToSource(e.GetPosition(this));
+
         if (Tool == EditorTool.Picker)
         {
             int x = (int)Math.Round(point.X);
@@ -176,10 +262,24 @@ internal sealed class ShotSurface : Grid
             return;
         }
 
+        // Endpoint / corner resize handle hit on currently selected mark
+        if (Tool != EditorTool.Crop && TryHitSelectedHandle(point, out var targetMark, out var handleKind))
+        {
+            CommitText();
+            _resizing = targetMark;
+            _resizeHandle = handleKind;
+            _resizeAnchor = AnnotationHandles.AnchorFor(targetMark, handleKind);
+            _moveFrom = targetMark.Points.Select(p => p).ToList();
+            Document.BeginEdit();
+            CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
         if (Tool == EditorTool.Select)
         {
             var hit = Hit(point);
-            _selected = hit?.Id;
+            SetSelected(hit?.Id);
             if (hit != null && e.ClickCount >= 2 && hit.Kind is AnnotationKind.Text or AnnotationKind.Callout)
             {
                 BeginEdit(hit, isNew: false);
@@ -212,7 +312,7 @@ internal sealed class ShotSurface : Grid
             mark.Kind = AnnotationKind.Number;
             mark.Points.Add(point);
             Document.AddAnnotation(mark);
-            _selected = mark.Id;
+            SetSelected(mark.Id);
             return;
         }
 
@@ -227,9 +327,18 @@ internal sealed class ShotSurface : Grid
 
     private void OnMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed)
-            return;
         var point = ToSource(e.GetPosition(this));
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            UpdateHoverCursor(point);
+            return;
+        }
+        if (_resizing != null)
+        {
+            AnnotationHandles.ApplyResize(_resizing, _resizeHandle, _resizeAnchor, point, Keyboard.Modifiers == ModifierKeys.Shift);
+            _paint.InvalidateVisual();
+            return;
+        }
         if (_moving != null && _moveFrom != null)
         {
             double dx = point.X - _press.X;
@@ -255,6 +364,49 @@ internal sealed class ShotSurface : Grid
         _paint.InvalidateVisual();
     }
 
+    private void UpdateHoverCursor(PointD point)
+    {
+        if (Tool != EditorTool.Picker && Tool != EditorTool.Crop && TryHitSelectedHandle(point, out _, out var handle))
+        {
+            Cursor = handle switch
+            {
+                AnnotationHandleKind.NorthWest or AnnotationHandleKind.SouthEast => Cursors.SizeNWSE,
+                AnnotationHandleKind.NorthEast or AnnotationHandleKind.SouthWest => Cursors.SizeNESW,
+                _ => Cursors.SizeAll
+            };
+            return;
+        }
+
+        if (Tool == EditorTool.Select)
+        {
+            Cursor = Hit(point) != null ? Cursors.SizeAll : Cursors.Arrow;
+            return;
+        }
+
+        Cursor = Tool == EditorTool.Text ? Cursors.IBeam : Cursors.Cross;
+    }
+
+    private bool TryHitSelectedHandle(PointD point, out Annotation mark, out AnnotationHandleKind handleKind)
+    {
+        mark = null!;
+        handleKind = default;
+        var selected = SelectedAnnotation;
+        if (selected == null)
+            return false;
+
+        double tolerance = Math.Max(7, 8 * PixelScale);
+        foreach (var handle in AnnotationHandles.For(selected))
+        {
+            if (double.Hypot(handle.Position.X - point.X, handle.Position.Y - point.Y) <= tolerance)
+            {
+                mark = selected;
+                handleKind = handle.Kind;
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void OnUp(object sender, MouseButtonEventArgs e) => FinishDrag(cancel: false);
 
     private void FinishDrag(bool cancel)
@@ -266,15 +418,18 @@ internal sealed class ShotSurface : Grid
         {
             if (IsMouseCaptured)
                 ReleaseMouseCapture();
+            if (_resizing != null)
+            {
+                bool changed = !cancel && PointsMoved(_moveFrom, _resizing.Points, 0.5);
+                Document.EndEdit(changed);
+                _resizing = null;
+                _moveFrom = null;
+                return;
+            }
             if (_moving != null)
             {
-                double dx = _moving.Points.Count > 0 && _moveFrom is { Count: > 0 }
-                    ? _moving.Points[0].X - _moveFrom[0].X
-                    : 0;
-                double dy = _moving.Points.Count > 0 && _moveFrom is { Count: > 0 }
-                    ? _moving.Points[0].Y - _moveFrom[0].Y
-                    : 0;
-                Document.EndEdit(!cancel && Math.Abs(dx) + Math.Abs(dy) > 1.5);
+                bool changed = !cancel && PointsMoved(_moveFrom, _moving.Points, 1.5);
+                Document.EndEdit(changed);
                 _moving = null;
                 _moveFrom = null;
                 return;
@@ -302,12 +457,24 @@ internal sealed class ShotSurface : Grid
                 return;
             }
             Document.AddAnnotation(draft);
-            _selected = draft.Id;
+            SetSelected(draft.Id);
         }
         finally
         {
             _finishing = false;
         }
+    }
+
+    private static bool PointsMoved(List<PointD>? before, List<PointD> after, double threshold)
+    {
+        if (before == null || before.Count != after.Count)
+            return true;
+        for (int i = 0; i < before.Count; i++)
+        {
+            if (Math.Abs(after[i].X - before[i].X) + Math.Abs(after[i].Y - before[i].Y) > threshold)
+                return true;
+        }
+        return false;
     }
 
     private void BeginEdit(Annotation annotation, bool isNew)
@@ -350,7 +517,7 @@ internal sealed class ShotSurface : Grid
             }
             annotation.Text = string.IsNullOrWhiteSpace(text) ? "Note" : text;
             Document.AddAnnotation(annotation);
-            _selected = annotation.Id;
+            SetSelected(annotation.Id);
             return;
         }
         Document.UpdateText(annotation.Id, text);
@@ -420,13 +587,15 @@ internal sealed class ShotSurface : Grid
             EditorTool.Highlighter => AnnotationKind.Highlighter,
             EditorTool.Callout => AnnotationKind.Callout,
             EditorTool.Blur => AnnotationKind.Blur,
+            EditorTool.Redact => AnnotationKind.Redact,
             EditorTool.Spotlight => AnnotationKind.Spotlight,
             EditorTool.Crop => AnnotationKind.Rectangle,
             _ => AnnotationKind.Pen
         },
         ColorHex = ColorHex,
         Stroke = StrokeWidth,
-        FontSize = FontSize
+        FontSize = FontSize,
+        FillMode = FillMode
     };
 
     private void RefreshEditorInk()
@@ -441,7 +610,7 @@ internal sealed class ShotSurface : Grid
         _box.FontSize = Math.Max(10, _editing.FontSize / PixelScale);
     }
 
-    private static void ApplyLive(Annotation mark, string? color, double? stroke, double? font)
+    private static void ApplyLive(Annotation mark, string? color, double? stroke, double? font, ShapeFillMode? fillMode)
     {
         if (color != null && mark.Kind != AnnotationKind.Blur)
             mark.ColorHex = HexColor.Normalize(color, mark.ColorHex);
@@ -449,6 +618,8 @@ internal sealed class ShotSurface : Grid
             mark.Stroke = Math.Clamp(stroke.Value, 1, 16);
         if (font != null && mark.Kind is AnnotationKind.Text or AnnotationKind.Callout or AnnotationKind.Number)
             mark.FontSize = Math.Clamp(font.Value, 8, 72);
+        if (fillMode != null && mark.Kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse)
+            mark.FillMode = fillMode.Value;
     }
 
     private PointD ToSource(Point dip) => new(dip.X * PixelScale + Document.View.X, dip.Y * PixelScale + Document.View.Y);
@@ -489,6 +660,11 @@ internal sealed class ShotSurface : Grid
             if (bubble.Contains(point.X, point.Y))
                 return true;
             return annotation.Points.Count > 0 && double.Hypot(annotation.Points[0].X - point.X, annotation.Points[0].Y - point.Y) <= 14;
+        }
+        if (annotation.Kind == AnnotationKind.Number && annotation.Points.Count > 0)
+        {
+            double radius = Math.Max(12, annotation.FontSize * 0.72) + 6;
+            return double.Hypot(annotation.Points[0].X - point.X, annotation.Points[0].Y - point.Y) <= radius;
         }
         if (annotation.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Highlighter)
             return Distance(annotation.Points, point) <= Math.Max(8, (annotation.Kind == AnnotationKind.Highlighter ? annotation.Stroke * 4 : annotation.Stroke) + 4);
