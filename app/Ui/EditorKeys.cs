@@ -42,7 +42,8 @@ internal static class EditorKeys
         if (ctrl && e.Key == Key.S)
         {
             surface.CommitEditing();
-            session.Save(surface.IsVisible ? WindowOf(surface) : System.Windows.Application.Current.MainWindow!);
+            var owner = surface.IsVisible ? WindowOf(surface) : System.Windows.Application.Current.MainWindow!;
+            owner.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() => session.Save(owner)));
             e.Handled = true;
             return true;
         }

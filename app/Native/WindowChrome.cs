@@ -67,4 +67,73 @@ internal static class WindowChrome
         }
         NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlExStyle, new IntPtr(ex));
     }
+
+    public static void SetTopmost(Window window, bool topmost)
+    {
+        try
+        {
+            window.Topmost = topmost;
+            var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero)
+                return;
+            var after = topmost ? NativeMethods.HwndTopmost : NativeMethods.HwndNotTopmost;
+            NativeMethods.SetWindowPos(hwnd, after, 0, 0, 0, 0,
+                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate);
+        }
+        catch
+        {
+            // Window may have closed.
+        }
+    }
+
+    public static IDisposable SuspendTopmost(Window? owner = null)
+    {
+        var saved = new List<Window>();
+        var app = Application.Current;
+        if (app != null)
+        {
+            foreach (Window w in app.Windows.OfType<Window>().ToList())
+            {
+                if (w.IsVisible && w.Topmost)
+                {
+                    saved.Add(w);
+                    SetTopmost(w, false);
+                }
+            }
+        }
+        return new TopmostScope(saved, owner);
+    }
+
+    private sealed class TopmostScope : IDisposable
+    {
+        private readonly List<Window> _windows;
+        private readonly Window? _owner;
+        private bool _disposed;
+
+        public TopmostScope(List<Window> windows, Window? owner)
+        {
+            _windows = windows;
+            _owner = owner;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+            // Restore OverlayWindows first so the editor/owner stays above them.
+            foreach (var w in _windows.Where(w => w is OverlayWindow && w != _owner))
+            {
+                if (w.IsVisible)
+                    SetTopmost(w, true);
+            }
+            foreach (var w in _windows.Where(w => w is not OverlayWindow && w != _owner))
+            {
+                if (w.IsVisible)
+                    SetTopmost(w, true);
+            }
+            if (_owner != null && _windows.Contains(_owner) && _owner.IsVisible)
+                SetTopmost(_owner, true);
+        }
+    }
 }

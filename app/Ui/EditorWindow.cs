@@ -165,7 +165,7 @@ internal sealed class EditorWindow : Window
         _toolbar.SaveClicked += () =>
         {
             _surface.CommitEditing();
-            _session.Save(this);
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() => _session.Save(this)));
         };
         _toolbar.OcrClicked += RunOcr;
         _toolbar.PinClicked += Pin;

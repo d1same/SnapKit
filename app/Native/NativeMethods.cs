@@ -36,9 +36,11 @@ internal static class NativeMethods
     public const int VkRWin = 0x5C;
     public const int VkSnapshot = 0x2C;
     public const uint MouseEventWheel = 0x0800;
+    public const uint SwpNoSize = 0x0001;
+    public const uint SwpNoMove = 0x0002;
+    public const uint SwpNoActivate = 0x0010;
     public const uint SwpFrameChanged = 0x0020;
     public const uint SwpShowWindow = 0x0040;
-    public const uint SwpNoActivate = 0x0010;
     public const int DwmwaExtendedFrameBounds = 9;
     public const int DwmwaCloaked = 14;
     public const int DwmwaUseImmersiveDarkMode = 20;

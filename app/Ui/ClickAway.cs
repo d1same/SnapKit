@@ -19,6 +19,9 @@ internal static class ClickAway
     }
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window, State> Windows = new();
+    private static int _globalPaused;
+
+    public static bool IsAnyPaused => _globalPaused > 0;
 
     public static void Attach(Window window, Action close, Func<bool> enabled)
     {
@@ -26,13 +29,13 @@ internal static class ClickAway
         window.Activated += (_, _) => state.SawActive = true;
         window.Deactivated += (_, _) =>
         {
-            if (state.Paused > 0 || !state.SawActive || !enabled())
+            if (state.Paused > 0 || _globalPaused > 0 || !state.SawActive || !enabled())
                 return;
             if (Environment.TickCount64 - state.OpenedAt < 400)
                 return;
             window.Dispatcher.BeginInvoke(() =>
             {
-                if (state.Paused > 0 || !window.IsVisible || window.IsActive || MenuIsOpen(window))
+                if (state.Paused > 0 || _globalPaused > 0 || !window.IsVisible || window.IsActive || MenuIsOpen(window))
                     return;
                 close();
             }, DispatcherPriority.ApplicationIdle);
@@ -43,6 +46,7 @@ internal static class ClickAway
     {
         var state = Windows.GetOrCreateValue(window);
         state.Paused++;
+        _globalPaused++;
         return new Resume(state);
     }
 
@@ -70,6 +74,7 @@ internal static class ClickAway
             if (_state == null)
                 return;
             _state.Paused = Math.Max(0, _state.Paused - 1);
+            _globalPaused = Math.Max(0, _globalPaused - 1);
             _state = null;
         }
     }

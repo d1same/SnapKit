@@ -400,6 +400,8 @@ internal sealed class OverlayWindow : Window
         if (_frozen && msg == NativeMethods.WmMouseActivate)
         {
             handled = true;
+            if (ClickAway.IsAnyPaused)
+                return new IntPtr(NativeMethods.MaNoActivate);
             if (_session.CloseOnClickAway())
                 _session.Dismiss();
             else

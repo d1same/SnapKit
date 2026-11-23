@@ -184,7 +184,7 @@ internal sealed class InPlaceEditorWindow : Window
         _toolbar.SaveClicked += () =>
         {
             _surface.CommitEditing();
-            _session.Save(this);
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() => _session.Save(this)));
         };
         _toolbar.OcrClicked += RunOcr;
         _toolbar.PinClicked += Pin;
@@ -355,7 +355,7 @@ internal sealed class InPlaceEditorWindow : Window
 
     private void OnAdjustDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton != MouseButton.Left || _adjust != null)
+        if (e.ChangedButton != MouseButton.Left || _adjust != null || _toolbar.IsMouseOver)
             return;
         var edge = HitAdjust(e.GetPosition(_canvas));
         if (edge == null)
@@ -376,7 +376,7 @@ internal sealed class InPlaceEditorWindow : Window
     {
         if (_adjust == null)
         {
-            Cursor = CursorFor(HitAdjust(e.GetPosition(_canvas)));
+            Cursor = _toolbar.IsMouseOver ? null : CursorFor(HitAdjust(e.GetPosition(_canvas)));
             return;
         }
         if (e.LeftButton != MouseButtonState.Pressed)

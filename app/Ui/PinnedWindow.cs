@@ -288,8 +288,11 @@ internal sealed class PinnedWindow : Window
 
     private void SaveAs()
     {
-        if (ImageFile.Save(_image, this))
-            ShowToast("Saved");
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            if (ImageFile.Save(_image, this))
+                ShowToast("Saved");
+        }));
     }
 
     private void QuickSave()

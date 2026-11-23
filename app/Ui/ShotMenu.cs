@@ -29,7 +29,7 @@ internal static class ShotMenu
         menu.Items.Add(DarkMenu.Item("Save as…", () =>
         {
             surface.CommitEditing();
-            session.Save(owner);
+            owner.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => session.Save(owner)));
         }, "Ctrl+S"));
         menu.Items.Add(DarkMenu.Separator());
         menu.Items.Add(DarkMenu.Item("Copy Text (OCR)", () =>

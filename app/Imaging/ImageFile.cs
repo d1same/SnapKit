@@ -173,20 +173,29 @@ internal static class ImageFile
 
     public static bool Save(BitmapSource image, Window owner)
     {
-        bool wasTopmost = owner.Topmost;
-        owner.Topmost = false;
+        try { System.Windows.Input.Mouse.Capture(null); } catch { /* ignore */ }
         using var pauseClickAway = ClickAway.Pause(owner);
+        using var suspendTopmost = WindowChrome.SuspendTopmost(owner);
+        bool saved = false;
         try
         {
+            string initialDir = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
                 Title = "Save capture",
                 Filter = "PNG image|*.png|JPEG image|*.jpg",
                 FileName = $"{Brand.Name}-{DateTime.Now:yyyyMMdd-HHmmss}.png",
+                InitialDirectory = Directory.Exists(initialDir) ? initialDir : "",
                 AddExtension = true,
                 OverwritePrompt = true
             };
-            if (dialog.ShowDialog(owner) != true)
+
+            // Passing a WS_EX_LAYERED transparent borderless owner can bury the Win32 IFileSaveDialog
+            // behind other windows or fullscreen overlays; show it top-level for transparent windows.
+            bool? result = owner.AllowsTransparency
+                ? dialog.ShowDialog()
+                : dialog.ShowDialog(owner);
+            if (result != true)
                 return false;
 
             using var stream = File.Create(dialog.FileName);
@@ -195,11 +204,18 @@ internal static class ImageFile
                 : new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(image));
             encoder.Save(stream);
+            saved = true;
             return true;
         }
         finally
         {
-            owner.Topmost = wasTopmost;
+            if (!saved && owner.IsVisible)
+            {
+                owner.Dispatcher.BeginInvoke(() =>
+                {
+                    try { owner.Activate(); } catch { /* closed */ }
+                }, DispatcherPriority.Input);
+            }
         }
     }
 

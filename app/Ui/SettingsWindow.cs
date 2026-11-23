@@ -227,6 +227,7 @@ internal sealed class SettingsWindow : Window
 
     private void PickQuickSaveFolder()
     {
+        using var suspend = WindowChrome.SuspendTopmost(this);
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
             Title = "Choose Quick Save folder",
