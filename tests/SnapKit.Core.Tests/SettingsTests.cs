@@ -73,6 +73,17 @@ public class SettingsTests
     }
 
     [Fact]
+    public void Hotkey_gesture_matches_exact_key_and_modifiers()
+    {
+        var settings = AppSettings.CreateDefault();
+        Assert.True(settings.Area.MatchesKey(0x2C, ctrl: false, alt: false, shift: false, win: false));
+        Assert.False(settings.Area.MatchesKey(0x2C, ctrl: false, alt: true, shift: false, win: false));
+        Assert.True(settings.FullScreen.MatchesKey(0x2C, ctrl: false, alt: true, shift: false, win: false));
+        Assert.True(settings.Scrolling.MatchesKey(0x2C, ctrl: true, alt: false, shift: true, win: false));
+        Assert.False(new HotkeyGesture().MatchesKey(0x2C, false, false, false, false));
+    }
+
+    [Fact]
     public void Roundtrip_keeps_persisted_style_defaults_and_last_area()
     {
         var settings = AppSettings.CreateDefault();

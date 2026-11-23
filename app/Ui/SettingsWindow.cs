@@ -72,6 +72,46 @@ internal sealed class SettingsWindow : Window
                 shortcutsContent.Children.Add(Hairline());
             shortcutsContent.Children.Add(ShortcutRow(actions[i]));
         }
+        if (HotkeyHost.IsWindowsSnippingPrintScreenEnabled())
+        {
+            shortcutsContent.Children.Add(Hairline());
+            var snipRow = new Grid { Margin = new Thickness(2, 8, 2, 4) };
+            snipRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            snipRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var snipText = new TextBlock
+            {
+                Text = "Windows Snipping Tool is enabled on PrtSc. SnapKit intercepts it automatically, or disable it in Windows for admin apps too.",
+                Foreground = Palette.Muted,
+                FontFamily = Palette.Font,
+                FontSize = 11.5,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0)
+            };
+            var disableSnip = UiChrome.CreateButton("Disable in Windows", ButtonTone.Secondary, minWidth: 132);
+            disableSnip.Padding = new Thickness(10, 5, 10, 5);
+            disableSnip.FontSize = 12;
+            disableSnip.Click += (_, _) =>
+            {
+                if (HotkeyHost.DisableWindowsSnippingPrintScreen())
+                {
+                    _state.Hotkeys.RegisterAll();
+                    snipText.Text = "Disabled Windows Snipping Tool on PrtSc.";
+                    snipText.Foreground = Palette.Text;
+                    disableSnip.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    snipText.Text = "Could not update Windows setting. Disable it in Windows Settings → Accessibility → Keyboard.";
+                    snipText.Foreground = Palette.Danger;
+                }
+            };
+            Grid.SetColumn(snipText, 0);
+            Grid.SetColumn(disableSnip, 1);
+            snipRow.Children.Add(snipText);
+            snipRow.Children.Add(disableSnip);
+            shortcutsContent.Children.Add(snipRow);
+        }
         stack.Children.Add(UiChrome.Card(shortcutsContent, new Thickness(14, 10, 14, 10)));
 
         // Recording Card
@@ -234,7 +274,7 @@ internal sealed class SettingsWindow : Window
 
         _note = new TextBlock
         {
-            Text = $"Settings saved in {SettingsStore.FilePath}. If PrtSc still opens Windows Snipping Tool, disable it in Settings → Accessibility → Keyboard.",
+            Text = $"Settings saved in {SettingsStore.FilePath}. SnapKit intercepts PrtSc directly while running.",
             Foreground = Palette.Subtle,
             FontFamily = Palette.Font,
             FontSize = 11.5,
@@ -258,7 +298,13 @@ internal sealed class SettingsWindow : Window
             }
         };
         SourceInitialized += (_, _) => WindowChrome.UseDarkTitle(this);
-        Closed += (_, _) => StopListening();
+        Closed += (_, _) =>
+        {
+            bool wasListening = _listening != null;
+            StopListening();
+            if (wasListening)
+                _state.Hotkeys.RegisterAll();
+        };
     }
 
     private void PickQuickSaveFolder()

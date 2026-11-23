@@ -58,6 +58,14 @@ public sealed class HotkeyGesture
         && Alt == other.Alt
         && Shift == other.Shift
         && Win == other.Win;
+
+    public bool MatchesKey(int virtualKey, bool ctrl, bool alt, bool shift, bool win) =>
+        !IsEmpty
+        && VirtualKey == virtualKey
+        && Ctrl == ctrl
+        && Alt == alt
+        && Shift == shift
+        && Win == win;
 }
 
 public static class HotkeyFormatter

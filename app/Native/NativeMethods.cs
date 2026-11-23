@@ -27,8 +27,13 @@ internal static class NativeMethods
     public const int SwRestore = 9;
     public const int WhKeyboardLl = 13;
     public const int WmKeyDown = 0x0100;
+    public const int WmKeyUp = 0x0101;
     public const int WmSysKeyDown = 0x0104;
+    public const int WmSysKeyUp = 0x0105;
     public const int WmHotkey = 0x0312;
+    public const int WmSettingChange = 0x001A;
+    public const uint LlkhfInjected = 0x10;
+    public const uint LlkhfAltDown = 0x20;
     public const int WmMouseWheel = 0x020A;
     public const int VkLButton = 0x01;
     public const int VkRButton = 0x02;
@@ -187,4 +192,17 @@ internal static class NativeMethods
         [FieldOffset(0)] public uint Type;
         [FieldOffset(8)] public MouseInput Mouse;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KbdLlHookStruct
+    {
+        public uint VkCode;
+        public uint ScanCode;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, UIntPtr wParam, string lParam, uint flags, uint timeout, out UIntPtr result);
 }
