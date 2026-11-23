@@ -105,7 +105,7 @@ internal sealed class CaptureCoordinator
                 _busy = false;
                 return;
             }
-            _ = FinishScroll(pick.WindowHandle);
+            _ = FinishScroll(pick.WindowHandle, pick.ScreenX, pick.ScreenY);
             return;
         }
         _busy = false;
@@ -218,7 +218,7 @@ internal sealed class CaptureCoordinator
         }
     }
 
-    private async Task FinishScroll(IntPtr hwnd)
+    private async Task FinishScroll(IntPtr hwnd, int clickX, int clickY)
     {
         var hud = new ScrollHud();
         try
@@ -229,20 +229,26 @@ internal sealed class CaptureCoordinator
             double scale = monitor.Scale <= 0 ? 1 : monitor.Scale;
             hud.Dispatcher.Invoke(() =>
             {
-                // The hud sizes to content after show; nudge it to the bottom of the monitor.
-                int width = Math.Max(220, (int)(hud.ActualWidth * scale));
-                int height = Math.Max(36, (int)(hud.ActualHeight * scale));
-                WindowChrome.Place(hud, monitor.X + 16, monitor.Y + 16, width, height, scale, topmost: true, activate: false);
+                hud.UpdateLayout();
+                int width = Math.Max(220, (int)Math.Ceiling(hud.ActualWidth * scale));
+                int height = Math.Max(36, (int)Math.Ceiling(hud.ActualHeight * scale));
+                int x = monitor.X + Math.Max(16, (monitor.Width - width) / 2);
+                int y = monitor.Bottom - height - 64;
+                if (y < monitor.Y + 16)
+                    y = monitor.Y + 16;
+                WindowChrome.Place(hud, x, y, width, height, scale, topmost: true, activate: false);
             });
-            var image = await ScrollCapture.RunAsync(hwnd, hud, hud.Token);
-            if (image == null)
+            var outcome = await ScrollCapture.RunAsync(hwnd, clickX, clickY, hud, hud.Token);
+            if (outcome.Image == null)
             {
                 _state.Tray?.Balloon(Brand.Name, "Scrolling capture was cancelled.");
                 return;
             }
+            if (!outcome.Scrolled)
+                _state.Tray?.Balloon(Brand.Name, "Window did not scroll — captured visible view. Tip: click directly inside the scrollable area.");
             if (_state.Settings.ShutterSound)
                 Shutter.Play();
-            EditorWindow.OpenNew(image, _state);
+            EditorWindow.OpenNew(outcome.Image, _state);
         }
         catch (Exception ex)
         {

@@ -433,7 +433,7 @@ internal sealed class OverlayWindow : Window
         {
             OverlayMode.Window => prefix + "Window    ·    Click the highlighted window    ·    Space changes mode    ·    Esc cancels",
             OverlayMode.FullScreen => prefix + "Full screen    ·    Click to select this monitor    ·    Space changes mode    ·    Esc cancels",
-            OverlayMode.ScrollPick => "Click the window to scroll-capture    ·    Esc cancels    ·    Ctrl+Alt+Shift+Esc quits",
+            OverlayMode.ScrollPick => "Click inside the scrollable area to capture    ·    Esc cancels",
             _ => prefix + "Drag an area or click a window/region    ·    Space changes mode    ·    Esc cancels"
         };
         Cursor = _session.Mode == OverlayMode.Area ? Cursors.Cross : Cursors.Hand;
@@ -529,7 +529,13 @@ internal sealed class OverlayWindow : Window
                 return;
             if (_session.Mode == OverlayMode.ScrollPick)
             {
-                _session.Complete(new CapturePick { WindowHandle = window.Handle, WindowTitle = window.Title });
+                _session.Complete(new CapturePick
+                {
+                    WindowHandle = window.Handle,
+                    WindowTitle = window.Title,
+                    ScreenX = cursor.X,
+                    ScreenY = cursor.Y
+                });
                 return;
             }
             FinishWindow(window);

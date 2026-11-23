@@ -71,7 +71,7 @@ internal sealed class EditorWindow : Window
 
         Wire();
         SourceInitialized += (_, _) => WindowChrome.UseDarkTitle(this);
-        Loaded += (_, _) => Dispatcher.BeginInvoke(Fit, System.Windows.Threading.DispatcherPriority.ContextIdle);
+        Loaded += (_, _) => Dispatcher.BeginInvoke(FitInitial, System.Windows.Threading.DispatcherPriority.ContextIdle);
         PreviewKeyDown += (_, e) => EditorKeys.Handle(
             e,
             _session,
@@ -235,6 +235,22 @@ internal sealed class EditorWindow : Window
         var source = PresentationSource.FromVisual(this);
         double dpi = source?.CompositionTarget?.TransformToDevice.M11 ?? 1;
         return dpi <= 0 ? 1 : dpi;
+    }
+
+    private void FitInitial()
+    {
+        var metrics = BackdropLayout.Measure(_session.Document.Backdrop, _session.Document.View.Width, _session.Document.View.Height);
+        if (metrics.TotalHeight > metrics.TotalWidth * 1.6)
+        {
+            double dpi = CurrentDpi();
+            double availW = Math.Max(120, _scroller.ViewportWidth - 56);
+            if (availW < 140)
+                availW = Math.Max(availW, ActualWidth - 72);
+            SetZoom(Math.Min(1.0 / dpi, availW / metrics.TotalWidth));
+            _scroller.ScrollToTop();
+            return;
+        }
+        Fit();
     }
 
     private void Fit()

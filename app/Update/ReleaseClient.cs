@@ -27,7 +27,7 @@ internal static class ReleaseClient
 
     public static string TempRoot => Path.Combine(Path.GetTempPath(), "SnapKit-update");
 
-    public static Version Current => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 3, 1);
+    public static Version Current => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 3, 2);
 
     public static string Display
     {
