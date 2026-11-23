@@ -181,7 +181,7 @@ internal sealed class RecordHudWindow : Window
         recBtn.MouseLeftButtonDown += (_, e) => e.Handled = true;
         recBtn.MouseLeftButtonUp += (_, e) => { e.Handled = true; StartRecording(); };
 
-        var cancelBtn = IconButton("×", "Cancel  (Esc)", CancelAndClose);
+        var cancelBtn = IconButton(LucideIcon.Close, "Cancel  (Esc)", CancelAndClose);
 
         _readyRow.Children.Add(_mp4Chip);
         _readyRow.Children.Add(_gifChip);
@@ -229,7 +229,7 @@ internal sealed class RecordHudWindow : Window
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        _drawToggleChip = ToggleChip("✎ Draw", "Toggle live tutorial drawing over the recording area", () => SetLiveDraw(!_drawOverlay.IsDrawMode));
+        _drawToggleChip = ToggleIconTextChip(LucideIcon.Pen, "Draw", "Toggle live tutorial drawing over the recording area", () => SetLiveDraw(!_drawOverlay.IsDrawMode));
         _drawToggleChip.Height = 28;
         _drawToggleChip.Padding = new Thickness(9, 0, 9, 0);
         _drawToggleChip.Margin = new Thickness(2, 0, 3, 0);
@@ -249,14 +249,24 @@ internal sealed class RecordHudWindow : Window
 
         _stopLabel = new TextBlock
         {
-            Text = "■  Stop",
+            Text = "Stop",
             Foreground = Palette.Ink,
             FontFamily = Palette.Font,
             FontSize = 12.5,
             FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(5, 0, 0, 0)
         };
-        _stopChip = ActionPill(_stopLabel, "Stop recording and finish", () => _ = StopAndPresentAsync(), primary: true);
+        _stopChip = ActionPill(
+            new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { LucideIcons.Create(LucideIcon.Stop, Palette.Ink, size: 11.5, strokeWidth: 2.0, filled: true), _stopLabel }
+            },
+            "Stop recording and finish",
+            () => _ = StopAndPresentAsync(),
+            primary: true);
 
         _liveRow.Children.Add(_liveDot);
         _liveRow.Children.Add(_liveFormat);
@@ -268,21 +278,20 @@ internal sealed class RecordHudWindow : Window
 
         // Live draw tool strip (shown beneath live row when Draw mode is active)
         var drawRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var liveTools = new (AnnotationKind Kind, string Label, string Tip)[]
+        var liveTools = new (AnnotationKind Kind, LucideIcon Icon, string Tip)[]
         {
-            (AnnotationKind.Arrow, "↗", "Arrow"),
-            (AnnotationKind.Pen, "✎", "Pen"),
-            (AnnotationKind.Rectangle, "□", "Box"),
-            (AnnotationKind.Ellipse, "○", "Circle"),
-            (AnnotationKind.Highlighter, "▬", "Highlighter"),
-            (AnnotationKind.Number, "①", "Step #"),
-            (AnnotationKind.Blur, "▦", "Live Blur (pixelates pixels directly into the video; never auto-fades)"),
-            (AnnotationKind.Redact, "■", "Solid Blackout Redact (never auto-fades)")
+            (AnnotationKind.Arrow, LucideIcon.Arrow, "Arrow"),
+            (AnnotationKind.Pen, LucideIcon.Pen, "Pen"),
+            (AnnotationKind.Rectangle, LucideIcon.Rectangle, "Box"),
+            (AnnotationKind.Ellipse, LucideIcon.Ellipse, "Circle"),
+            (AnnotationKind.Highlighter, LucideIcon.Highlighter, "Highlighter"),
+            (AnnotationKind.Number, LucideIcon.Number, "Step #"),
+            (AnnotationKind.Blur, LucideIcon.Blur, "Live Blur (pixelates pixels directly into the video; never auto-fades)"),
+            (AnnotationKind.Redact, LucideIcon.Redact, "Solid Blackout Redact (never auto-fades)")
         };
-        foreach (var (kind, glyph, tip) in liveTools)
+        foreach (var (kind, icon, tip) in liveTools)
         {
-            var chip = ToggleChip(glyph, tip, () => SelectLiveTool(kind));
-            chip.Padding = new Thickness(7, 0, 7, 0);
+            var chip = ToggleIconChip(icon, tip, () => SelectLiveTool(kind));
             _drawToolChips[kind] = chip;
             drawRow.Children.Add(chip);
         }
@@ -317,10 +326,8 @@ internal sealed class RecordHudWindow : Window
         });
         drawRow.Children.Add(_fadeChip);
 
-        var undoChip = ToggleChip("Undo", "Undo last mark", () => _drawOverlay.Undo());
-        var clearChip = ToggleChip("Clear", "Clear all marks on screen", () => _drawOverlay.Clear());
-        drawRow.Children.Add(undoChip);
-        drawRow.Children.Add(clearChip);
+        drawRow.Children.Add(IconButton(LucideIcon.Undo, "Undo last mark", () => _drawOverlay.Undo()));
+        drawRow.Children.Add(IconButton(LucideIcon.Trash, "Clear all marks on screen", () => _drawOverlay.Clear()));
 
         _drawBar = new Border
         {
@@ -670,14 +677,81 @@ internal sealed class RecordHudWindow : Window
         return chip;
     }
 
+    private static Border ToggleIconChip(LucideIcon icon, string tip, Action click)
+    {
+        var chip = new Border
+        {
+            Width = 26,
+            Height = 26,
+            Margin = new Thickness(1, 0, 1, 0),
+            CornerRadius = new CornerRadius(6),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tip,
+            SnapsToDevicePixels = true,
+            Child = LucideIcons.Create(icon, Palette.Muted, size: 14, strokeWidth: 1.9)
+        };
+        chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        return chip;
+    }
+
+    private static Border ToggleIconTextChip(LucideIcon icon, string label, string tip, Action click)
+    {
+        var chip = new Border
+        {
+            Height = 26,
+            Margin = new Thickness(1, 0, 1, 0),
+            Padding = new Thickness(8, 0, 9, 0),
+            CornerRadius = new CornerRadius(7),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tip,
+            SnapsToDevicePixels = true,
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children =
+                {
+                    LucideIcons.Create(icon, Palette.Muted, size: 13.5, strokeWidth: 1.9),
+                    new TextBlock
+                    {
+                        Text = label,
+                        Foreground = Palette.Muted,
+                        FontFamily = Palette.Font,
+                        FontSize = 11.5,
+                        FontWeight = FontWeights.SemiBold,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(5, 0, 0, 0)
+                    }
+                }
+            }
+        };
+        chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        return chip;
+    }
+
     private static void PaintToggle(Border chip, bool on)
     {
         chip.Background = on ? Palette.ActiveSurface : Brushes.Transparent;
+        var ink = on ? Palette.Ink : Palette.Muted;
         if (chip.Child is TextBlock tb)
-            tb.Foreground = on ? Palette.Ink : Palette.Muted;
+            tb.Foreground = ink;
+        else if (chip.Child is Viewbox vb)
+            LucideIcons.Recolor(vb, ink);
+        else if (chip.Child is StackPanel sp)
+        {
+            foreach (var child in sp.Children)
+            {
+                if (child is TextBlock t) t.Foreground = ink;
+                else if (child is Viewbox v) LucideIcons.Recolor(v, ink);
+            }
+        }
     }
 
-    private static Border ActionPill(TextBlock label, string tip, Action click, bool primary)
+    private static Border ActionPill(UIElement content, string tip, Action click, bool primary)
     {
         var idle = primary ? Palette.ActiveSurface : Palette.Elevated;
         var hover = primary ? Palette.ActiveHover : Palette.Hover;
@@ -692,7 +766,7 @@ internal sealed class RecordHudWindow : Window
             BorderThickness = new Thickness(primary ? 0 : 1),
             Cursor = Cursors.Hand,
             ToolTip = tip,
-            Child = label,
+            Child = content,
             SnapsToDevicePixels = true
         };
         chip.MouseEnter += (_, _) => { if (chip.IsEnabled) chip.Background = hover; };
@@ -702,7 +776,7 @@ internal sealed class RecordHudWindow : Window
         return chip;
     }
 
-    private static Border IconButton(string glyph, string tip, Action click)
+    private static Border IconButton(LucideIcon glyph, string tip, Action click)
     {
         var chip = new Border
         {
@@ -713,15 +787,7 @@ internal sealed class RecordHudWindow : Window
             Background = Brushes.Transparent,
             Cursor = Cursors.Hand,
             ToolTip = tip,
-            Child = new TextBlock
-            {
-                Text = glyph,
-                Foreground = Palette.Muted,
-                FontFamily = Palette.Font,
-                FontSize = 14,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            }
+            Child = LucideIcons.Create(glyph, Palette.Muted, size: 14, strokeWidth: 1.9)
         };
         chip.MouseEnter += (_, _) => chip.Background = Palette.Hover;
         chip.MouseLeave += (_, _) => chip.Background = Brushes.Transparent;

@@ -66,23 +66,23 @@ internal sealed class RecordingDoneWindow : Window
             Margin = new Thickness(0, 10, 0, 0)
         };
 
-        var copyBtn = UiChrome.ActionButton("Copy file", CopyFile, ButtonTone.Primary, minWidth: 100);
+        var copyBtn = IconActionButton(LucideIcon.Copy, "Copy file", CopyFile, ButtonTone.Primary, minWidth: 108);
         copyBtn.ToolTip = "Copy file to clipboard  (Ctrl+C)";
         copyBtn.Margin = new Thickness(0, 0, 6, 6);
 
-        var annotateBtn = UiChrome.ActionButton("Annotate", OpenEditor, ButtonTone.Secondary, minWidth: 92);
+        var annotateBtn = IconActionButton(LucideIcon.Pen, "Annotate", OpenEditor, ButtonTone.Secondary, minWidth: 100);
         annotateBtn.ToolTip = "Add timed arrows, callouts, steps, blur, or trim video  (E)";
         annotateBtn.Margin = new Thickness(0, 0, 6, 6);
 
-        var quickBtn = UiChrome.ActionButton("Quick Save", QuickSave, ButtonTone.Secondary, minWidth: 92);
+        var quickBtn = IconActionButton(LucideIcon.FolderDown, "Quick Save", QuickSave, ButtonTone.Secondary, minWidth: 104);
         quickBtn.ToolTip = "Save directly to your Quick Save folder  (Ctrl+Shift+S)";
         quickBtn.Margin = new Thickness(0, 0, 6, 6);
 
-        var saveBtn = UiChrome.ActionButton("Save as…", SaveAs, ButtonTone.Secondary, minWidth: 82);
+        var saveBtn = IconActionButton(LucideIcon.Save, "Save as…", SaveAs, ButtonTone.Secondary, minWidth: 92);
         saveBtn.ToolTip = "Choose save location  (Ctrl+S)";
         saveBtn.Margin = new Thickness(0, 0, 6, 6);
 
-        var playBtn = UiChrome.ActionButton("Play", OpenPreview, ButtonTone.Secondary, minWidth: 58);
+        var playBtn = IconActionButton(LucideIcon.Play, "Play", OpenPreview, ButtonTone.Secondary, minWidth: 72, filledIcon: true);
         playBtn.ToolTip = "Open in default player";
         playBtn.Margin = new Thickness(0, 0, 6, 6);
 
@@ -222,5 +222,31 @@ internal sealed class RecordingDoneWindow : Window
         var pill = UiChrome.Pill(text, Palette.Field, Palette.Muted, Palette.Line, mono: true);
         pill.Margin = new Thickness(0, 0, 6, 0);
         return pill;
+    }
+
+    private static Button IconActionButton(LucideIcon icon, string label, Action click, ButtonTone tone, double minWidth, bool filledIcon = false)
+    {
+        var btn = UiChrome.ActionButton(label, click, tone, minWidth);
+        var ink = tone == ButtonTone.Primary ? Palette.Ink : Palette.Text;
+        btn.Content = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children =
+            {
+                LucideIcons.Create(icon, ink, size: 13.5, strokeWidth: tone == ButtonTone.Primary ? 2.0 : 1.9, filled: filledIcon),
+                new TextBlock
+                {
+                    Text = label,
+                    Foreground = ink,
+                    FontFamily = Palette.Font,
+                    FontSize = 12.5,
+                    FontWeight = tone == ButtonTone.Primary ? FontWeights.SemiBold : FontWeights.Medium,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(6, 0, 0, 0)
+                }
+            }
+        };
+        return btn;
     }
 }

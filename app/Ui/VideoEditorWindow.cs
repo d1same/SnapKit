@@ -58,6 +58,7 @@ internal sealed class VideoEditorWindow : Window
     private readonly TextBlock _fontSizeLabel;
     private readonly TextBlock _timingLabel;
     private readonly TextBlock _playLabel;
+    private readonly ContentControl _playIconHost;
     private readonly TextBlock _timeLabel;
     private readonly TextBlock _statusText;
     private readonly Border _copyBtn;
@@ -129,36 +130,36 @@ internal sealed class VideoEditorWindow : Window
 
         // ── Top Tool Rail ───────────────────────────────────────────────────────
         var railLeft = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var toolDefs = new (ToolMode Mode, string Label, string KeyHint, string Tip)[]
+        var toolDefs = new (ToolMode Mode, LucideIcon Icon, string KeyHint, string Tip)[]
         {
-            (ToolMode.Select, "Sel", "V", "Select / Move / Resize  (V)"),
-            (ToolMode.Arrow, "↗", "A", "Arrow  (A)"),
-            (ToolMode.Pen, "✎", "P", "Freehand Pen  (P)"),
-            (ToolMode.Rectangle, "□", "R", "Box  (R)"),
-            (ToolMode.Ellipse, "○", "E", "Circle  (E)"),
-            (ToolMode.Highlighter, "▬", "H", "Highlighter  (H)"),
-            (ToolMode.Text, "T", "T", "Text label  (T)"),
-            (ToolMode.Callout, "💬", "C", "Speech Callout  (C)"),
-            (ToolMode.Number, "①", "N", "Step number  (N)"),
-            (ToolMode.Blur, "▦", "B", "Pixelate / Blur sensitive info  (B)"),
-            (ToolMode.Redact, "■", "D", "Solid blackout redact  (D)"),
-            (ToolMode.Spotlight, "◎", "S", "Spotlight highlight  (S)")
+            (ToolMode.Select, LucideIcon.Select, "V", "Select / Move / Resize  (V)"),
+            (ToolMode.Arrow, LucideIcon.Arrow, "A", "Arrow  (A)"),
+            (ToolMode.Pen, LucideIcon.Pen, "P", "Freehand Pen  (P)"),
+            (ToolMode.Rectangle, LucideIcon.Rectangle, "R", "Box  (R)"),
+            (ToolMode.Ellipse, LucideIcon.Ellipse, "E", "Circle  (E)"),
+            (ToolMode.Highlighter, LucideIcon.Highlighter, "H", "Highlighter  (H)"),
+            (ToolMode.Text, LucideIcon.Text, "T", "Text label  (T)"),
+            (ToolMode.Callout, LucideIcon.Callout, "C", "Speech Callout  (C)"),
+            (ToolMode.Number, LucideIcon.Number, "N", "Step number  (N)"),
+            (ToolMode.Blur, LucideIcon.Blur, "B", "Pixelate / Blur sensitive info  (B)"),
+            (ToolMode.Redact, LucideIcon.Redact, "D", "Solid blackout redact  (D)"),
+            (ToolMode.Spotlight, LucideIcon.Spotlight, "S", "Spotlight highlight  (S)")
         };
-        foreach (var (mode, label, hint, tip) in toolDefs)
+        foreach (var (mode, icon, hint, tip) in toolDefs)
         {
-            var btn = ToolChip(label, hint, tip, () => SelectTool(mode));
+            var btn = ToolChip(icon, hint, tip, () => SelectTool(mode));
             _toolButtons[mode] = btn;
             railLeft.Children.Add(btn);
         }
 
         railLeft.Children.Add(RailDivider());
-        railLeft.Children.Add(SmallChip("↶", "Undo  (Ctrl+Z)", () => { CommitInlineText(); _track.Undo(); }));
-        railLeft.Children.Add(SmallChip("↷", "Redo  (Ctrl+Y)", () => { CommitInlineText(); _track.Redo(); }));
-        railLeft.Children.Add(SmallChip("Clear", "Clear all annotations", () => { CommitInlineText(); _selectedId = null; _track.Clear(); }));
+        railLeft.Children.Add(SmallIconChip(LucideIcon.Undo, "Undo  (Ctrl+Z)", () => { CommitInlineText(); _track.Undo(); }));
+        railLeft.Children.Add(SmallIconChip(LucideIcon.Redo, "Redo  (Ctrl+Y)", () => { CommitInlineText(); _track.Redo(); }));
+        railLeft.Children.Add(SmallIconChip(LucideIcon.Trash, "Clear all annotations", () => { CommitInlineText(); _selectedId = null; _track.Clear(); }));
 
         var railRight = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        _quickSaveBtn = ActionPill("Quick Save", "Export & save to Quick Save folder  (Ctrl+Shift+S)", () => _ = ExportAndQuickSaveAsync(), primary: false);
-        _saveAsBtn = ActionPill("Save as…", "Export & choose location  (Ctrl+S)", () => _ = ExportAndSaveAsAsync(), primary: false);
+        _quickSaveBtn = ActionPill(LucideIcon.FolderDown, "Quick Save", "Export & save to Quick Save folder  (Ctrl+Shift+S)", () => _ = ExportAndQuickSaveAsync(), primary: false);
+        _saveAsBtn = ActionPill(LucideIcon.Save, "Save as…", "Export & choose location  (Ctrl+S)", () => _ = ExportAndSaveAsAsync(), primary: false);
         _copyBtnLabel = new TextBlock
         {
             Text = "Copy file",
@@ -166,9 +167,19 @@ internal sealed class VideoEditorWindow : Window
             FontFamily = Palette.Font,
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(5, 0, 0, 0)
         };
-        _copyBtn = ActionPillWithLabel(_copyBtnLabel, "Export & copy file to clipboard  (Ctrl+C)", () => _ = ExportAndCopyAsync(), primary: true);
+        _copyBtn = ActionPillWithContent(
+            new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { LucideIcons.Create(LucideIcon.Copy, Palette.Ink, size: 13.5, strokeWidth: 2.0), _copyBtnLabel }
+            },
+            "Export & copy file to clipboard  (Ctrl+C)",
+            () => _ = ExportAndCopyAsync(),
+            primary: true);
         railRight.Children.Add(_quickSaveBtn);
         railRight.Children.Add(_saveAsBtn);
         railRight.Children.Add(_copyBtn);
@@ -387,16 +398,32 @@ internal sealed class VideoEditorWindow : Window
         };
 
         // ── Bottom Timeline Panel ───────────────────────────────────────────────
+        _playIconHost = new ContentControl
+        {
+            Content = LucideIcons.Create(LucideIcon.Play, Palette.Text, size: 12.5, strokeWidth: 2.0, filled: true),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 5, 0),
+            IsHitTestVisible = false
+        };
         _playLabel = new TextBlock
         {
-            Text = "▶  Play",
+            Text = "Play",
             Foreground = Palette.Text,
             FontFamily = Palette.Font,
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
         };
-        var playBtn = ActionPillWithLabel(_playLabel, "Play / Pause  (Space)", () => SetPlaying(!_playing), primary: false);
+        var playBtn = ActionPillWithContent(
+            new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { _playIconHost, _playLabel }
+            },
+            "Play / Pause  (Space)",
+            () => SetPlaying(!_playing),
+            primary: false);
         var backBtn = SmallChip("−1s", "Step back 1 second", () => SeekTo(_currentTime - 1.0));
         var fwdBtn = SmallChip("+1s", "Step forward 1 second", () => SeekTo(_currentTime + 1.0));
 
@@ -593,7 +620,8 @@ internal sealed class VideoEditorWindow : Window
             CommitInlineText();
 
         _playing = play;
-        _playLabel.Text = _playing ? "❚❚ Pause" : "▶  Play";
+        _playIconHost.Content = LucideIcons.Create(_playing ? LucideIcon.Pause : LucideIcon.Play, Palette.Text, size: 12.5, strokeWidth: 2.0, filled: true);
+        _playLabel.Text = _playing ? "Pause" : "Play";
 
         if (_playing)
         {
@@ -1428,38 +1456,35 @@ internal sealed class VideoEditorWindow : Window
         VerticalAlignment = VerticalAlignment.Center
     };
 
-    private static Border ToolChip(string glyph, string keyHint, string tip, Action click)
+    private static Border ToolChip(LucideIcon glyph, string keyHint, string tip, Action click)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        row.Children.Add(new TextBlock
-        {
-            Text = glyph,
-            Foreground = Palette.Text,
-            FontFamily = Palette.Font,
-            FontSize = 12,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
-        });
-        row.Children.Add(new TextBlock
+        var icon = LucideIcons.Create(glyph, Palette.Text, size: 14.5, strokeWidth: 1.9);
+        icon.Margin = new Thickness(0, 0, 2, 2);
+        var hint = new TextBlock
         {
             Text = keyHint,
             Foreground = Palette.Subtle,
-            FontFamily = Palette.Mono,
-            FontSize = 9,
-            Margin = new Thickness(3, 3, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        });
+            FontFamily = Palette.Font,
+            FontSize = 7.5,
+            FontWeight = FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 2.5, 1),
+            IsHitTestVisible = false
+        };
         var chip = new Border
         {
-            Height = 26,
-            Padding = new Thickness(7, 0, 7, 0),
+            Width = 30,
+            Height = 28,
             Margin = new Thickness(1, 0, 1, 0),
-            CornerRadius = new CornerRadius(6),
+            CornerRadius = new CornerRadius(7),
             Background = Brushes.Transparent,
             Cursor = Cursors.Hand,
             ToolTip = tip,
-            Child = row
+            Child = new Grid { Children = { icon, hint } }
         };
+        chip.MouseEnter += (_, _) => { if (chip.Background == Brushes.Transparent) chip.Background = Palette.Hover; };
+        chip.MouseLeave += (_, _) => { if (chip.Background == Palette.Hover) chip.Background = Brushes.Transparent; };
         chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
         chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
         return chip;
@@ -1468,13 +1493,36 @@ internal sealed class VideoEditorWindow : Window
     private static void PaintToolChip(Border chip, bool active)
     {
         chip.Background = active ? Palette.ActiveSurface : Brushes.Transparent;
-        if (chip.Child is StackPanel sp && sp.Children.Count >= 2)
+        if (chip.Child is Grid grid)
         {
-            if (sp.Children[0] is TextBlock main)
-                main.Foreground = active ? Palette.Ink : Palette.Text;
-            if (sp.Children[1] is TextBlock hint)
-                hint.Foreground = active ? Palette.Subtle : Palette.Subtle;
+            foreach (var child in grid.Children)
+            {
+                if (child is Viewbox vb)
+                    LucideIcons.Recolor(vb, active ? Palette.Ink : Palette.Text);
+                else if (child is TextBlock tb)
+                    tb.Foreground = active ? Palette.Ink : Palette.Subtle;
+            }
         }
+    }
+
+    private static Border SmallIconChip(LucideIcon glyph, string tip, Action click)
+    {
+        var chip = new Border
+        {
+            Width = 28,
+            Height = 28,
+            Margin = new Thickness(1, 0, 1, 0),
+            CornerRadius = new CornerRadius(7),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tip,
+            Child = LucideIcons.Create(glyph, Palette.Text, size: 14.5, strokeWidth: 1.9)
+        };
+        chip.MouseEnter += (_, _) => chip.Background = Palette.Hover;
+        chip.MouseLeave += (_, _) => chip.Background = Brushes.Transparent;
+        chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        return chip;
     }
 
     private static Border SmallChip(string label, string tip, Action click)
@@ -1513,18 +1561,28 @@ internal sealed class VideoEditorWindow : Window
             tb.Foreground = active ? Palette.Ink : Palette.Text;
     }
 
-    private static Border ActionPill(string label, string tip, Action click, bool primary) =>
-        ActionPillWithLabel(new TextBlock
+    private static Border ActionPill(LucideIcon icon, string label, string tip, Action click, bool primary) =>
+        ActionPillWithContent(new StackPanel
         {
-            Text = label,
-            Foreground = primary ? Palette.Ink : Palette.Text,
-            FontFamily = Palette.Font,
-            FontSize = 12,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children =
+            {
+                LucideIcons.Create(icon, primary ? Palette.Ink : Palette.Text, size: 13.5, strokeWidth: 1.9),
+                new TextBlock
+                {
+                    Text = label,
+                    Foreground = primary ? Palette.Ink : Palette.Text,
+                    FontFamily = Palette.Font,
+                    FontSize = 12,
+                    FontWeight = FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(5, 0, 0, 0)
+                }
+            }
         }, tip, click, primary);
 
-    private static Border ActionPillWithLabel(TextBlock label, string tip, Action click, bool primary)
+    private static Border ActionPillWithContent(UIElement content, string tip, Action click, bool primary)
     {
         var idle = primary ? Palette.ActiveSurface : Palette.Elevated;
         var hover = primary ? Palette.ActiveHover : Palette.Hover;
@@ -1539,7 +1597,7 @@ internal sealed class VideoEditorWindow : Window
             BorderThickness = new Thickness(primary ? 0 : 1),
             Cursor = Cursors.Hand,
             ToolTip = tip,
-            Child = label
+            Child = content
         };
         chip.MouseEnter += (_, _) => { if (chip.IsEnabled) chip.Background = hover; };
         chip.MouseLeave += (_, _) => chip.Background = idle;

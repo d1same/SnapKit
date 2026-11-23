@@ -102,18 +102,26 @@ internal sealed class UpdateWindow : Window
 
         if (!string.IsNullOrWhiteSpace(info.HtmlUrl))
         {
-            var openLink = new TextBlock
+            var openText = new TextBlock
             {
-                Text = "View on GitHub ↗",
+                Text = "View on GitHub",
                 Foreground = Palette.Text,
                 FontFamily = Palette.Font,
                 FontSize = 11.5,
-                Cursor = Cursors.Hand,
-                HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            openLink.MouseEnter += (_, _) => openLink.TextDecorations = TextDecorations.Underline;
-            openLink.MouseLeave += (_, _) => openLink.TextDecorations = null;
+            var openIcon = LucideIcons.Create(LucideIcon.ExternalLink, Palette.Muted, size: 12, strokeWidth: 2.0);
+            openIcon.Margin = new Thickness(4, 0, 0, 0);
+            var openLink = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Cursor = Cursors.Hand,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { openText, openIcon }
+            };
+            openLink.MouseEnter += (_, _) => openText.TextDecorations = TextDecorations.Underline;
+            openLink.MouseLeave += (_, _) => openText.TextDecorations = null;
             openLink.MouseLeftButtonUp += (_, _) =>
             {
                 try { Process.Start(new ProcessStartInfo(info.HtmlUrl) { UseShellExecute = true }); }

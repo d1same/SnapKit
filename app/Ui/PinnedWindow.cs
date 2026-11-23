@@ -53,10 +53,24 @@ internal sealed class PinnedWindow : Window
             FontSize = 10.5,
             VerticalAlignment = VerticalAlignment.Center
         };
-        var copyChip = HoverChip(HoverLabel("Copy", Palette.Ink), "Copy image  (Ctrl+C or double-click)", TryCopy, primary: true);
-        var saveChip = HoverChip(HoverLabel("Save", Palette.Text), "Save image  (Ctrl+S · Ctrl+Shift+S quick save)", SaveAs, primary: false);
+        var copyChip = HoverChip(
+            new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { LucideIcons.Create(LucideIcon.Copy, Palette.Ink, size: 12.5, strokeWidth: 2.0), MarginLeft(HoverLabel("Copy", Palette.Ink), 4) }
+            },
+            "Copy image  (Ctrl+C or double-click)", TryCopy, primary: true);
+        var saveChip = HoverChip(
+            new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { LucideIcons.Create(LucideIcon.Save, Palette.Text, size: 12.5, strokeWidth: 1.9), MarginLeft(HoverLabel("Save", Palette.Text), 4) }
+            },
+            "Save image  (Ctrl+S · Ctrl+Shift+S quick save)", SaveAs, primary: false);
         var opacityPill = HoverChip(_opacityText, "Opacity (Ctrl+Scroll 20%–100%, click to cycle)", CycleOpacity, primary: false);
-        var closeChip = HoverChip(HoverLabel("×", Palette.Text, 13.5), "Close pin  (Esc)", Close, primary: false);
+        var closeChip = HoverChip(LucideIcons.Create(LucideIcon.Close, Palette.Text, size: 13, strokeWidth: 2.0), "Close pin  (Esc)", Close, primary: false);
         closeChip.MinWidth = 24;
 
         _hoverBar = new Border
@@ -354,5 +368,11 @@ internal sealed class PinnedWindow : Window
             click();
         };
         return chip;
+    }
+
+    private static FrameworkElement MarginLeft(FrameworkElement element, double left)
+    {
+        element.Margin = new Thickness(left, 0, 0, 0);
+        return element;
     }
 }

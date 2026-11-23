@@ -41,7 +41,7 @@ internal sealed class ToolbarView : StackPanel
     private readonly Border _clear;
     private readonly Border _copyButton;
     private readonly TextBlock _copyLabel;
-    private readonly Shape _copyIcon;
+    private readonly UIElement _copyIcon;
     private readonly TextBlock? _zoomText;
     private readonly TextBlock _dims;
     private readonly Border _copiedPill;
@@ -59,46 +59,46 @@ internal sealed class ToolbarView : StackPanel
         // ── Top Pill: Slim Single-Row Floating Tool Rail ────────────────────────────
         var railRow = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
 
-        AddTool(railRow, EditorTool.Select, "V", "Select, move, or drag handles  (V)", "M7,4 L7,20 L11,16 L14.5,22 L17.5,20.5 L14,14.5 L20,14.5 Z", filled: true);
+        AddTool(railRow, EditorTool.Select, "V", "Select, move, or drag handles  (V)", LucideIcon.Select);
         railRow.Children.Add(Divider());
 
-        AddTool(railRow, EditorTool.Arrow, "A", "Arrow  (A) · Hold Shift for 45°", "M5,19 L19,5 M19,5 L12,6.2 M19,5 L17.8,12");
-        AddTool(railRow, EditorTool.Pen, "P", "Freehand pen  (P)", "M4,20 L8.5,18.5 L19,8 L16,5 L5.5,15.5 Z M15.2,6.2 L17.8,8.8");
-        AddTool(railRow, EditorTool.Rectangle, "R", "Rectangle  (R) · Shift = square", "M5,5 H19 V19 H5 Z");
-        AddTool(railRow, EditorTool.Ellipse, "E", "Ellipse  (E) · Shift = circle", "M12,5.5 A6.5,6.5 0 1 0 12.1,5.5");
-        AddTool(railRow, EditorTool.Highlighter, "H", "Highlighter  (H)", "M4,15 L14,5 L19,10 L9,20 Z M4,15 L7.5,18.5");
+        AddTool(railRow, EditorTool.Arrow, "A", "Arrow  (A) · Hold Shift for 45°", LucideIcon.Arrow);
+        AddTool(railRow, EditorTool.Pen, "P", "Freehand pen  (P)", LucideIcon.Pen);
+        AddTool(railRow, EditorTool.Rectangle, "R", "Rectangle  (R) · Shift = square", LucideIcon.Rectangle);
+        AddTool(railRow, EditorTool.Ellipse, "E", "Ellipse  (E) · Shift = circle", LucideIcon.Ellipse);
+        AddTool(railRow, EditorTool.Highlighter, "H", "Highlighter  (H)", LucideIcon.Highlighter);
         railRow.Children.Add(Divider());
 
-        AddTool(railRow, EditorTool.Text, "T", "Text  (T)", "M5,5 H19 M12,5 V19 M8,19 H16");
-        AddTool(railRow, EditorTool.Callout, "C", "Callout note  (C)", "M4,4 H20 V14 H12 L8,19 V14 H4 Z");
-        AddTool(railRow, EditorTool.Number, "N", "Step number  (N)", "M12,4.5 A7.5,7.5 0 1 0 12.1,4.5 M12,8 V16 M9.5,10.2 L12,8");
+        AddTool(railRow, EditorTool.Text, "T", "Text  (T)", LucideIcon.Text);
+        AddTool(railRow, EditorTool.Callout, "C", "Callout note  (C)", LucideIcon.Callout);
+        AddTool(railRow, EditorTool.Number, "N", "Step number  (N)", LucideIcon.Number);
         railRow.Children.Add(Divider());
 
-        AddTool(railRow, EditorTool.Blur, "B", "Pixelate blur  (B)", "M4,4 H10 V10 H4 Z M14,4 H20 V10 H14 Z M4,14 H10 V20 H4 Z M14,14 H20 V20 H14 Z");
-        AddTool(railRow, EditorTool.Redact, "D", "Redact blackout box  (D)", "M4,6 H20 V18 H4 Z", filled: true);
-        AddTool(railRow, EditorTool.Spotlight, "S", "Spotlight focus  (S)", "M12,3 V6 M12,18 V21 M3,12 H6 M18,12 H21 M6,6 L8,8 M16,16 L18,18 M18,6 L16,8 M8,16 L6,18 M12,8.5 A3.5,3.5 0 1 0 12.1,8.5");
+        AddTool(railRow, EditorTool.Blur, "B", "Pixelate blur  (B)", LucideIcon.Blur);
+        AddTool(railRow, EditorTool.Redact, "D", "Redact blackout box  (D)", LucideIcon.Redact);
+        AddTool(railRow, EditorTool.Spotlight, "S", "Spotlight focus  (S)", LucideIcon.Spotlight);
         railRow.Children.Add(Divider());
 
-        AddTool(railRow, EditorTool.Crop, "X", "Crop area  (X)", "M8,4 V8 H4 M16,4 V8 H20 M20,16 H16 V20 M4,16 H8 V20");
-        AddTool(railRow, EditorTool.Picker, "I", "Eyedropper — pick & copy #HEX  (I)", "M14,4 L20,10 L10,20 L6,21 L7,17 Z M8,15 L13,10");
+        AddTool(railRow, EditorTool.Crop, "X", "Crop area  (X)", LucideIcon.Crop);
+        AddTool(railRow, EditorTool.Picker, "I", "Eyedropper — pick & copy #HEX  (I)", LucideIcon.Eyedropper);
         railRow.Children.Add(Divider());
 
-        _undo = RailIconChip("M8,7 A6,6 0 1 0 14,12 M8,7 V11 M8,7 H12", "Undo  (Ctrl+Z)", () => UndoClicked?.Invoke());
-        _redo = RailIconChip("M16,7 A6,6 0 1 1 10,12 M16,7 V11 M16,7 H12", "Redo  (Ctrl+Y)", () => RedoClicked?.Invoke());
-        _clear = RailIconChip("M6,7 H18 M9,7 V5 H15 V7 M8,7 L9,19 H15 L16,7", "Clear all marks", () => ClearAllClicked?.Invoke());
+        _undo = RailIconChip(LucideIcon.Undo, "Undo  (Ctrl+Z)", () => UndoClicked?.Invoke());
+        _redo = RailIconChip(LucideIcon.Redo, "Redo  (Ctrl+Y)", () => RedoClicked?.Invoke());
+        _clear = RailIconChip(LucideIcon.Trash, "Clear all marks", () => ClearAllClicked?.Invoke());
         railRow.Children.Add(_undo);
         railRow.Children.Add(_redo);
         railRow.Children.Add(_clear);
         railRow.Children.Add(Divider());
 
-        railRow.Children.Add(RailCompactAction("M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M8,12 H16 M8,16 H14", "OCR", "Copy text from capture (OCR)", () => OcrClicked?.Invoke()));
-        railRow.Children.Add(RailCompactAction("M9,3 H15 L17,8 H19 L12,15 L5,8 H7 Z M12,15 V21", "Pin", "Pin floating on top", () => PinClicked?.Invoke()));
-        railRow.Children.Add(RailCompactAction("M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M8,13 H16 V21 H8 Z", "Save", "Save as… (Ctrl+S) · Quick Save (Ctrl+Shift+S)", () => SaveClicked?.Invoke()));
+        railRow.Children.Add(RailCompactAction(LucideIcon.Ocr, "OCR", "Copy text from capture (OCR)", () => OcrClicked?.Invoke()));
+        railRow.Children.Add(RailCompactAction(LucideIcon.Pin, "Pin", "Pin floating on top", () => PinClicked?.Invoke()));
+        railRow.Children.Add(RailCompactAction(LucideIcon.Save, "Save", "Save as… (Ctrl+S) · Quick Save (Ctrl+Shift+S)", () => SaveClicked?.Invoke()));
 
         if (showFit)
         {
             railRow.Children.Add(Divider());
-            railRow.Children.Add(RailTextChip("−", "Zoom out  (Ctrl+-)", () => ZoomOutClicked?.Invoke(), 24));
+            railRow.Children.Add(RailIconChip(LucideIcon.ZoomOut, "Zoom out  (Ctrl+-)", () => ZoomOutClicked?.Invoke()));
             _zoomText = new TextBlock
             {
                 Text = "100%",
@@ -110,14 +110,13 @@ internal sealed class ToolbarView : StackPanel
             var zoomReadout = PillChip(_zoomText, "Fit to window  (Ctrl+0) · Ctrl+1 for 100%", () => FitClicked?.Invoke());
             zoomReadout.MinWidth = 44;
             railRow.Children.Add(zoomReadout);
-            railRow.Children.Add(RailTextChip("+", "Zoom in  (Ctrl++)", () => ZoomInClicked?.Invoke(), 24));
+            railRow.Children.Add(RailIconChip(LucideIcon.ZoomIn, "Zoom in  (Ctrl++)", () => ZoomInClicked?.Invoke()));
         }
 
         railRow.Children.Add(Divider());
 
         // Crisp white Copy CTA on the right
-        _copyIcon = Icon("M8,8 H18 V20 H8 Z M6,6 H16 V8", filled: false, size: 14);
-        _copyIcon.Stroke = Palette.Ink;
+        _copyIcon = LucideIcons.Create(LucideIcon.Copy, Palette.Ink, size: 14, strokeWidth: 2.0);
         _copyLabel = new TextBlock
         {
             Text = "Copy",
@@ -154,7 +153,7 @@ internal sealed class ToolbarView : StackPanel
         };
         railRow.Children.Add(_copyButton);
 
-        var closeBtn = RailIconChip("M7,7 L17,17 M17,7 L7,17", "Discard & close  (Esc)", () => CloseClicked?.Invoke());
+        var closeBtn = RailIconChip(LucideIcon.Close, "Discard & close  (Esc)", () => CloseClicked?.Invoke());
         railRow.Children.Add(closeBtn);
 
         var topRail = FloatingPill(railRow, cornerRadius: 11, padding: new Thickness(5, 4, 5, 4));
@@ -534,9 +533,9 @@ internal sealed class ToolbarView : StackPanel
         VerticalAlignment = VerticalAlignment.Center
     };
 
-    private void AddTool(Panel panel, EditorTool tool, string key, string tip, string geometry, bool filled = false)
+    private void AddTool(Panel panel, EditorTool tool, string key, string tip, LucideIcon glyph)
     {
-        var icon = Icon(geometry, filled, 14.5);
+        var icon = LucideIcons.Create(glyph, Palette.Text, size: 15, strokeWidth: 1.9);
         icon.Margin = new Thickness(0, 0, 2, 2);
         var badge = new TextBlock
         {
@@ -561,16 +560,16 @@ internal sealed class ToolbarView : StackPanel
         panel.Children.Add(chip);
     }
 
-    private Border RailIconChip(string geometry, string tip, Action click)
+    private Border RailIconChip(LucideIcon glyph, string tip, Action click)
     {
-        var chip = FixedChip(Icon(geometry, false, 14), tip, click, 28, 28);
+        var chip = FixedChip(LucideIcons.Create(glyph, Palette.Text, size: 14.5, strokeWidth: 1.9), tip, click, 28, 28);
         chip.CornerRadius = new CornerRadius(7);
         return chip;
     }
 
-    private Border RailCompactAction(string geometry, string label, string tip, Action click)
+    private Border RailCompactAction(LucideIcon glyph, string label, string tip, Action click)
     {
-        var icon = Icon(geometry, false, 13);
+        var icon = LucideIcons.Create(glyph, Palette.Text, size: 13.5, strokeWidth: 1.9);
         var text = new TextBlock
         {
             Text = label,
@@ -578,7 +577,7 @@ internal sealed class ToolbarView : StackPanel
             FontFamily = Palette.Font,
             FontSize = 11.5,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 0, 0, 0)
+            Margin = new Thickness(5, 0, 0, 0)
         };
         var chip = PillChip(new StackPanel
         {
@@ -589,13 +588,6 @@ internal sealed class ToolbarView : StackPanel
         chip.Height = 28;
         chip.CornerRadius = new CornerRadius(7);
         chip.Padding = new Thickness(7, 0, 8, 0);
-        return chip;
-    }
-
-    private static Border RailTextChip(string text, string tip, Action click, double width)
-    {
-        var chip = FixedChip(MiniLabel(text, 13), tip, click, width, 28);
-        chip.CornerRadius = new CornerRadius(7);
         return chip;
     }
 
@@ -730,17 +722,37 @@ internal sealed class ToolbarView : StackPanel
 
     private static void PaintInk(DependencyObject node, Brush shapeInk, Brush labelInk)
     {
+        if (node is Viewbox vb)
+        {
+            LucideIcons.Recolor(vb, shapeInk);
+            return;
+        }
         if (node is Shape shape)
         {
             shape.Stroke = shapeInk;
             if (shape.Fill != null && shape.Fill != Brushes.Transparent)
                 shape.Fill = shapeInk;
+            return;
         }
-        else if (node is TextBlock block)
+        if (node is TextBlock block)
         {
             block.Foreground = labelInk;
+            return;
         }
-
+        if (node is Decorator dec && dec.Child is DependencyObject decChild)
+        {
+            PaintInk(decChild, shapeInk, labelInk);
+            return;
+        }
+        if (node is Panel panel)
+        {
+            foreach (var child in panel.Children)
+            {
+                if (child is DependencyObject dep)
+                    PaintInk(dep, shapeInk, labelInk);
+            }
+            return;
+        }
         int count = VisualTreeHelper.GetChildrenCount(node);
         for (int i = 0; i < count; i++)
         {
@@ -753,6 +765,20 @@ internal sealed class ToolbarView : StackPanel
     {
         if (node is TextBlock block)
             block.Foreground = textInk;
+        if (node is Decorator dec && dec.Child is DependencyObject decChild)
+        {
+            PaintTextOnly(decChild, textInk);
+            return;
+        }
+        if (node is Panel panel)
+        {
+            foreach (var child in panel.Children)
+            {
+                if (child is DependencyObject dep)
+                    PaintTextOnly(dep, textInk);
+            }
+            return;
+        }
         int count = VisualTreeHelper.GetChildrenCount(node);
         for (int i = 0; i < count; i++)
         {
@@ -770,21 +796,5 @@ internal sealed class ToolbarView : StackPanel
         FontWeight = FontWeights.SemiBold,
         HorizontalAlignment = HorizontalAlignment.Center,
         VerticalAlignment = VerticalAlignment.Center
-    };
-
-    private static Shape Icon(string geometry, bool filled = false, double size = 14.5) => new Path
-    {
-        Data = Geometry.Parse(geometry),
-        Stroke = Palette.Text,
-        StrokeThickness = 1.6,
-        Fill = filled ? Palette.Text : Brushes.Transparent,
-        Stretch = Stretch.Uniform,
-        Width = size,
-        Height = size,
-        HorizontalAlignment = HorizontalAlignment.Center,
-        VerticalAlignment = VerticalAlignment.Center,
-        StrokeStartLineCap = PenLineCap.Round,
-        StrokeEndLineCap = PenLineCap.Round,
-        StrokeLineJoin = PenLineJoin.Round
     };
 }
