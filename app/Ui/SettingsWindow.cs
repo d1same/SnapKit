@@ -146,6 +146,16 @@ internal sealed class SettingsWindow : Window
                 state.Settings.RecordMicAudio = value;
                 state.SaveSettings();
             }));
+        recordingContent.Children.Add(Hairline());
+        recordingContent.Children.Add(UiChrome.ToggleRow(
+            "3-2-1 countdown before recording",
+            "Show a brief 3-second countdown inside the frame before recording begins.",
+            state.Settings.RecordCountdown,
+            value =>
+            {
+                state.Settings.RecordCountdown = value;
+                state.SaveSettings();
+            }));
         stack.Children.Add(UiChrome.Card(recordingContent, new Thickness(10, 6, 10, 6)));
 
         // Behavior Card

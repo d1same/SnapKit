@@ -101,7 +101,7 @@ internal sealed class EditorWindow : Window
 
     public static EditorWindow Open(PixelBuffer image, RecentCapture recent, AppState state)
     {
-        var doc = new ShotDocument(image.Clone(), backdrop: state.Settings.LastBackdrop);
+        var doc = new ShotDocument(image.Clone(), backdrop: state.Settings.LastBackdrop, showStamp: state.Settings.ShowTicketStamp);
         var window = new EditorWindow(new EditorSession(doc, recent, state));
         window.Show();
         return window;
@@ -142,6 +142,13 @@ internal sealed class EditorWindow : Window
             _surface.RestyleSelection(null, null, null, mode);
         };
         _toolbar.BackdropPicked += preset => _session.SetBackdrop(preset);
+        _toolbar.AutoBlurClicked += () =>
+        {
+            _surface.CommitEditing();
+            _session.AutoBlurSensitive(useRedact: _session.Tool == EditorTool.Redact);
+        };
+        _toolbar.StampToggled += () => _session.SetStamp(!_session.Document.ShowStamp);
+        _toolbar.StampNoteChanged += note => _session.SetStamp(_session.Document.ShowStamp, note);
         _surface.ColorPicked += hex =>
         {
             _session.PickColorFromPixel(hex);

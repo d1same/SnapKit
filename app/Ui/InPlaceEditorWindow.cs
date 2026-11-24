@@ -112,7 +112,7 @@ internal sealed class InPlaceEditorWindow : Window
 
     public static InPlaceEditorWindow Show(PixelBuffer source, IntRect view, int sourceScreenX, int sourceScreenY, MonitorInfo monitor, AppState state, Action<IntRect>? reframe)
     {
-        var document = new ShotDocument(source, view, state.Settings.LastBackdrop);
+        var document = new ShotDocument(source, view, state.Settings.LastBackdrop, state.Settings.ShowTicketStamp);
         var recent = state.Recent.Add(document.ComposeUnderlay());
         var session = new EditorSession(document, recent, state);
         var window = new InPlaceEditorWindow(session, monitor, sourceScreenX, sourceScreenY, reframe);
@@ -161,6 +161,13 @@ internal sealed class InPlaceEditorWindow : Window
             _surface.RestyleSelection(null, null, null, mode);
         };
         _toolbar.BackdropPicked += preset => _session.SetBackdrop(preset);
+        _toolbar.AutoBlurClicked += () =>
+        {
+            _surface.CommitEditing();
+            _session.AutoBlurSensitive(useRedact: _session.Tool == EditorTool.Redact);
+        };
+        _toolbar.StampToggled += () => _session.SetStamp(!_session.Document.ShowStamp);
+        _toolbar.StampNoteChanged += note => _session.SetStamp(_session.Document.ShowStamp, note);
         _surface.ColorPicked += hex =>
         {
             _session.PickColorFromPixel(hex);

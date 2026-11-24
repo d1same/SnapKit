@@ -13,7 +13,8 @@ public enum AnnotationKind
     Number,
     Blur,
     Redact,
-    Spotlight
+    Spotlight,
+    Magnifier
 }
 
 public enum ShapeFillMode
@@ -47,6 +48,19 @@ public static class BackdropLayout
         int padBottom = padX + 6;
         int radius = Math.Clamp((int)Math.Round(Math.Min(w, h) * 0.025), 8, 14);
         return new BackdropMetrics(padX, padTop, padBottom, radius, w + padX * 2, h + padTop + padBottom);
+    }
+}
+
+public static class TicketStamp
+{
+    public static string Format(DateTime localTime, string? note, string? machineName = null)
+    {
+        string ts = localTime.ToString("yyyy-MM-dd HH:mm");
+        string trimmed = (note ?? "").Trim();
+        if (!string.IsNullOrEmpty(trimmed))
+            return $"{trimmed}  ·  {ts}";
+        string host = (machineName ?? "").Trim();
+        return string.IsNullOrEmpty(host) ? ts : $"{ts}  ·  {host}";
     }
 }
 

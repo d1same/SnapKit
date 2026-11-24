@@ -10,17 +10,20 @@ public sealed class ShotDocument
     public PixelBuffer Source { get; }
     public IntRect View { get; private set; }
     public BackdropPreset Backdrop { get; private set; } = BackdropPreset.None;
+    public bool ShowStamp { get; private set; }
+    public string StampNote { get; private set; } = "";
     public IReadOnlyList<Annotation> Annotations => _annotations;
     public int NextNumber { get; private set; } = 1;
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
     public event Action? Changed;
 
-    public ShotDocument(PixelBuffer source, IntRect? view = null, BackdropPreset backdrop = BackdropPreset.None)
+    public ShotDocument(PixelBuffer source, IntRect? view = null, BackdropPreset backdrop = BackdropPreset.None, bool showStamp = false)
     {
         Source = source;
         View = view?.Clamp(source.Width, source.Height, 2) ?? new IntRect(0, 0, source.Width, source.Height);
         Backdrop = backdrop;
+        ShowStamp = showStamp;
     }
 
     public void AddAnnotation(Annotation annotation)
@@ -36,6 +39,28 @@ public sealed class ShotDocument
             }
             _annotations.Add(annotation);
         });
+    }
+
+    public int AddAnnotations(IEnumerable<Annotation> annotations)
+    {
+        var list = annotations.ToList();
+        if (list.Count == 0)
+            return 0;
+        Commit(() =>
+        {
+            foreach (var annotation in list)
+            {
+                if (annotation.Kind == AnnotationKind.Number)
+                {
+                    if (annotation.Number <= 0)
+                        annotation.Number = NextNumber++;
+                    else
+                        NextNumber = Math.Max(NextNumber, annotation.Number + 1);
+                }
+                _annotations.Add(annotation);
+            }
+        });
+        return list.Count;
     }
 
     public void RemoveAnnotation(Guid id) => Commit(() => _annotations.RemoveAll(a => a.Id == id));
@@ -98,6 +123,19 @@ public sealed class ShotDocument
         return true;
     }
 
+    public bool SetStamp(bool show, string? note = null)
+    {
+        string nextNote = note ?? StampNote;
+        if (ShowStamp == show && string.Equals(StampNote, nextNote, StringComparison.Ordinal))
+            return false;
+        Commit(() =>
+        {
+            ShowStamp = show;
+            StampNote = nextNote;
+        });
+        return true;
+    }
+
     public bool Restyle(Guid id, string? colorHex, double? stroke, double? fontSize, ShapeFillMode? fillMode = null)
     {
         var mark = _annotations.FirstOrDefault(item => item.Id == id);
@@ -105,7 +143,7 @@ public sealed class ShotDocument
             return false;
 
         bool useColor = colorHex != null && mark.Kind != AnnotationKind.Blur;
-        bool useStroke = stroke != null && mark.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur;
+        bool useStroke = stroke != null && mark.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur or AnnotationKind.Magnifier;
         bool useFont = fontSize != null && mark.Kind is AnnotationKind.Text or AnnotationKind.Callout or AnnotationKind.Number;
         bool useFill = fillMode != null && mark.Kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse;
         string? nextColor = useColor ? HexColor.Normalize(colorHex, mark.ColorHex) : null;
@@ -245,6 +283,8 @@ public sealed class ShotDocument
     {
         View = View,
         Backdrop = Backdrop,
+        ShowStamp = ShowStamp,
+        StampNote = StampNote,
         Annotations = _annotations.Select(a => a.Clone()).ToList(),
         NextNumber = NextNumber
     };
@@ -253,6 +293,8 @@ public sealed class ShotDocument
     {
         View = snapshot.View;
         Backdrop = snapshot.Backdrop;
+        ShowStamp = snapshot.ShowStamp;
+        StampNote = snapshot.StampNote;
         _annotations.Clear();
         _annotations.AddRange(snapshot.Annotations);
         NextNumber = snapshot.NextNumber;
@@ -262,6 +304,8 @@ public sealed class ShotDocument
     {
         public IntRect View { get; init; }
         public BackdropPreset Backdrop { get; init; }
+        public bool ShowStamp { get; init; }
+        public string StampNote { get; init; } = "";
         public List<Annotation> Annotations { get; init; } = new();
         public int NextNumber { get; init; }
     }

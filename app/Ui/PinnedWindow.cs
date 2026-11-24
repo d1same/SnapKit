@@ -208,14 +208,18 @@ internal sealed class PinnedWindow : Window
 
         // Right-click opens menu only (no competing copy handler)
         var menu = DarkMenu.Create();
-        menu.Items.Add(DarkMenu.Item("Copy", TryCopy, "Ctrl+C"));
+        menu.Items.Add(DarkMenu.SectionHeader("Share & Save"));
+        menu.Items.Add(DarkMenu.Item("Copy image", TryCopy, "Ctrl+C"));
         menu.Items.Add(DarkMenu.Item("Quick Save", QuickSave, "Ctrl+Shift+S"));
         menu.Items.Add(DarkMenu.Item("Save as…", SaveAs, "Ctrl+S"));
         menu.Items.Add(DarkMenu.Separator());
-        menu.Items.Add(DarkMenu.Item("Opacity 100%", () => SetOpacity(1.0)));
-        menu.Items.Add(DarkMenu.Item("Opacity 75%", () => SetOpacity(0.75)));
-        menu.Items.Add(DarkMenu.Item("Opacity 50%", () => SetOpacity(0.50)));
-        menu.Items.Add(DarkMenu.Item("Opacity 25%", () => SetOpacity(0.25)));
+        menu.Items.Add(DarkMenu.SectionHeader("Window"));
+        var opacityMenu = DarkMenu.Submenu("Opacity");
+        opacityMenu.Items.Add(DarkMenu.Item("100% (Solid)", () => SetOpacity(1.0)));
+        opacityMenu.Items.Add(DarkMenu.Item("75%", () => SetOpacity(0.75)));
+        opacityMenu.Items.Add(DarkMenu.Item("50%", () => SetOpacity(0.50)));
+        opacityMenu.Items.Add(DarkMenu.Item("25%", () => SetOpacity(0.25)));
+        menu.Items.Add(opacityMenu);
         menu.Items.Add(DarkMenu.Item("Reset size & opacity", ResetView, "Ctrl+0"));
         menu.Items.Add(DarkMenu.Separator());
         menu.Items.Add(DarkMenu.Item("Close", Close, "Esc"));

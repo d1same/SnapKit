@@ -34,6 +34,14 @@ internal sealed class ToolbarView : StackPanel
     private readonly TextBlock _fontValue;
     private readonly Border _resetStep;
     private readonly TextBlock _resetStepLabel;
+    private readonly Border _autoBlurChip;
+    private readonly TextBlock _autoBlurLabel;
+    private readonly FrameworkElement _autoBlurSep;
+    private readonly Border _stampChip;
+    private readonly UIElement _stampIcon;
+    private readonly TextBlock _stampLabel;
+    private readonly Border _stampNoteBox;
+    private readonly TextBox _stampNote;
     private readonly TextBox _hex;
     private readonly Border _hexSwatch;
     private readonly Border _undo;
@@ -77,6 +85,7 @@ internal sealed class ToolbarView : StackPanel
         AddTool(railRow, EditorTool.Blur, "B", "Pixelate blur  (B)", LucideIcon.Blur);
         AddTool(railRow, EditorTool.Redact, "D", "Redact blackout box  (D)", LucideIcon.Redact);
         AddTool(railRow, EditorTool.Spotlight, "S", "Spotlight focus  (S)", LucideIcon.Spotlight);
+        AddTool(railRow, EditorTool.Magnifier, "M", "Magnifier 2× zoom loupe  (M)", LucideIcon.Loupe);
         railRow.Children.Add(Divider());
 
         AddTool(railRow, EditorTool.Crop, "X", "Crop area  (X)", LucideIcon.Crop);
@@ -298,7 +307,27 @@ internal sealed class ToolbarView : StackPanel
         optRow.Children.Add(_fontGroup);
         optRow.Children.Add(_fontSep);
 
-        // Docs Backdrop Frame toggle
+        // Contextual Auto-Blur PII action (visible only when Blur or Redact is active)
+        var autoBlurIcon = LucideIcons.Create(LucideIcon.Shield, Palette.Text, size: 12.5, strokeWidth: 1.9);
+        _autoBlurLabel = new TextBlock
+        {
+            Text = "Auto-blur PII",
+            Foreground = Palette.Text,
+            FontFamily = Palette.Font,
+            FontSize = 10.5,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 0, 0)
+        };
+        _autoBlurChip = PillChip(
+            new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { autoBlurIcon, _autoBlurLabel } },
+            "Scan offline OCR for emails, IPs, phones, cards & tokens and mask them automatically",
+            () => AutoBlurClicked?.Invoke());
+        _autoBlurSep = SmallDivider();
+        optRow.Children.Add(_autoBlurChip);
+        optRow.Children.Add(_autoBlurSep);
+
+        // Docs Backdrop Frame toggle + optional Ticket Proof Stamp
         var frameGroup = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         frameGroup.Children.Add(new TextBlock
         {
@@ -313,6 +342,67 @@ internal sealed class ToolbarView : StackPanel
         AddBackdropChip(frameGroup, BackdropPreset.Clean, "Clean", "Clean light docs frame with soft shadow");
         AddBackdropChip(frameGroup, BackdropPreset.Dark, "Dark", "Dark graphite docs frame");
         AddBackdropChip(frameGroup, BackdropPreset.Slate, "Slate", "Slate docs frame");
+
+        _stampIcon = LucideIcons.Create(LucideIcon.Stamp, Palette.Muted, size: 11.5, strokeWidth: 1.9);
+        _stampLabel = new TextBlock
+        {
+            Text = "Stamp",
+            Foreground = Palette.Muted,
+            FontFamily = Palette.Font,
+            FontSize = 10.5,
+            FontWeight = FontWeights.Medium,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 0, 0)
+        };
+        _stampChip = PillChip(
+            new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { _stampIcon, _stampLabel } },
+            "Stamp timestamp & optional ticket # on export (great for SLA / audit proof)",
+            () =>
+            {
+                if (!_sync)
+                    StampToggled?.Invoke();
+            });
+        _stampChip.Margin = new Thickness(5, 0, 0, 0);
+        frameGroup.Children.Add(_stampChip);
+
+        _stampNote = new TextBox
+        {
+            Text = "",
+            Width = 96,
+            Height = 20,
+            Background = Brushes.Transparent,
+            Foreground = Palette.Text,
+            BorderThickness = new Thickness(0),
+            FontFamily = Palette.Mono,
+            FontSize = 10.5,
+            CaretBrush = Palette.Text,
+            VerticalAlignment = VerticalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            MaxLength = 40,
+            ToolTip = "Optional ticket # or note (e.g. INC-4821) — press Enter to apply"
+        };
+        _stampNote.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter)
+                return;
+            CommitStampNote();
+            Keyboard.ClearFocus();
+            e.Handled = true;
+        };
+        _stampNote.LostKeyboardFocus += (_, _) => CommitStampNote();
+        _stampNoteBox = new Border
+        {
+            Background = Palette.Field,
+            BorderBrush = Palette.Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(5, 0, 4, 0),
+            Margin = new Thickness(4, 0, 0, 0),
+            Visibility = Visibility.Collapsed,
+            Child = _stampNote
+        };
+        frameGroup.Children.Add(_stampNoteBox);
+
         optRow.Children.Add(frameGroup);
         optRow.Children.Add(SmallDivider());
 
@@ -381,6 +471,9 @@ internal sealed class ToolbarView : StackPanel
     public event Action<double>? FontStepped;
     public event Action<ShapeFillMode>? FillModePicked;
     public event Action<BackdropPreset>? BackdropPicked;
+    public event Action? AutoBlurClicked;
+    public event Action? StampToggled;
+    public event Action<string>? StampNoteChanged;
     public event Action? UndoClicked;
     public event Action? RedoClicked;
     public event Action? ClearAllClicked;
@@ -408,6 +501,7 @@ internal sealed class ToolbarView : StackPanel
         HighlightSize(session.Stroke);
         HighlightFill(session.FillMode);
         HighlightBackdrop(session.Document.Backdrop);
+        HighlightStamp(session.Document.ShowStamp, session.Document.StampNote);
         UpdateContextualControls(session);
         UpdateDimensionsAndFeedback(session);
 
@@ -422,6 +516,26 @@ internal sealed class ToolbarView : StackPanel
         _sync = false;
     }
 
+    private void HighlightStamp(bool active, string note)
+    {
+        _stampChip.Background = active ? Palette.ActiveSurface : Palette.Group;
+        _stampChip.BorderBrush = active ? Palette.ActiveSurface : Palette.Line;
+        var ink = active ? Palette.Ink : Palette.Muted;
+        _stampLabel.Foreground = ink;
+        _stampLabel.FontWeight = active ? FontWeights.SemiBold : FontWeights.Medium;
+        LucideIcons.Recolor(_stampIcon, ink);
+        _stampNoteBox.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        if (!_stampNote.IsKeyboardFocusWithin)
+            _stampNote.Text = note;
+    }
+
+    private void CommitStampNote()
+    {
+        if (_sync)
+            return;
+        StampNoteChanged?.Invoke(_stampNote.Text ?? "");
+    }
+
     private void UpdateContextualControls(EditorSession session)
     {
         var tool = session.Tool;
@@ -429,13 +543,14 @@ internal sealed class ToolbarView : StackPanel
 
         bool showColor = tool is not (EditorTool.Blur or EditorTool.Crop)
             && !(tool == EditorTool.Select && sel == AnnotationKind.Blur);
-        bool showStroke = tool is EditorTool.Pen or EditorTool.Line or EditorTool.Arrow or EditorTool.Rectangle or EditorTool.Ellipse or EditorTool.Highlighter or EditorTool.Blur
-            || (tool == EditorTool.Select && sel is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur);
+        bool showStroke = tool is EditorTool.Pen or EditorTool.Line or EditorTool.Arrow or EditorTool.Rectangle or EditorTool.Ellipse or EditorTool.Highlighter or EditorTool.Blur or EditorTool.Magnifier
+            || (tool == EditorTool.Select && sel is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur or AnnotationKind.Magnifier);
         bool showFill = tool is EditorTool.Rectangle or EditorTool.Ellipse
             || (tool == EditorTool.Select && sel is AnnotationKind.Rectangle or AnnotationKind.Ellipse);
         bool showFont = tool is EditorTool.Text or EditorTool.Callout or EditorTool.Number
             || (tool == EditorTool.Select && sel is AnnotationKind.Text or AnnotationKind.Callout or AnnotationKind.Number);
         bool showResetStep = tool == EditorTool.Number || session.Document.NextNumber > 1;
+        bool showAutoBlur = tool is EditorTool.Blur or EditorTool.Redact;
 
         _colorGroup.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
         _colorSep.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
@@ -453,6 +568,10 @@ internal sealed class ToolbarView : StackPanel
         for (int i = 0; i < 3 && i < _fontGroup.Children.Count; i++)
             _fontGroup.Children[i].Visibility = showFont ? Visibility.Visible : Visibility.Collapsed;
         _resetStep.Visibility = showResetStep ? Visibility.Visible : Visibility.Collapsed;
+
+        _autoBlurLabel.Text = tool == EditorTool.Redact ? "Auto-redact PII" : "Auto-blur PII";
+        _autoBlurChip.Visibility = showAutoBlur ? Visibility.Visible : Visibility.Collapsed;
+        _autoBlurSep.Visibility = showAutoBlur ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void UpdateDimensionsAndFeedback(EditorSession session)

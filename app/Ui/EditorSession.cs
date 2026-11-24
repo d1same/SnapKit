@@ -19,6 +19,7 @@ internal enum EditorTool
     Blur,
     Redact,
     Spotlight,
+    Magnifier,
     Crop,
     Picker
 }
@@ -137,6 +138,68 @@ internal sealed class EditorSession
         PersistStyle();
         Status = preset == BackdropPreset.None ? "Frame off" : $"{preset} frame";
         Changed?.Invoke();
+    }
+
+    public void SetStamp(bool show, string? note = null)
+    {
+        IsCopiedFeedback = false;
+        Document.SetStamp(show, note);
+        State.Settings.ShowTicketStamp = show;
+        PersistStyle();
+        Status = show ? "Proof stamp on" : "Proof stamp off";
+        Changed?.Invoke();
+    }
+
+    private bool _autoBlurring;
+
+    public async void AutoBlurSensitive(bool useRedact = false)
+    {
+        if (_autoBlurring)
+            return;
+        _autoBlurring = true;
+        Flash("Scanning for emails, IPs & tokens…");
+        try
+        {
+            var view = Document.View;
+            var underlay = Document.ComposeUnderlay();
+            var page = await OcrClient.RecognizeAsync(underlay);
+            var boxes = page.Words.Select(w => w.WordBox).ToList();
+            var matches = SensitiveTextDetector.Find(boxes);
+            if (matches.Count == 0)
+            {
+                Flash("No sensitive info detected");
+                return;
+            }
+
+            var kind = useRedact ? AnnotationKind.Redact : AnnotationKind.Blur;
+            var marks = new List<Annotation>(matches.Count);
+            foreach (var m in matches)
+            {
+                marks.Add(new Annotation
+                {
+                    Kind = kind,
+                    ColorHex = RedactColorHex,
+                    Stroke = Math.Max(4, Stroke),
+                    Points = new List<PointD>
+                    {
+                        new(view.X + m.X, view.Y + m.Y),
+                        new(view.X + m.Right, view.Y + m.Bottom)
+                    }
+                });
+            }
+
+            Document.AddAnnotations(marks);
+            string verb = useRedact ? "Redacted" : "Blurred";
+            Flash($"{verb} {marks.Count} {(marks.Count == 1 ? "item" : "items")} (Ctrl+Z undoes)", copied: true);
+        }
+        catch (Exception ex)
+        {
+            Flash("Auto-blur failed: " + ex.Message);
+        }
+        finally
+        {
+            _autoBlurring = false;
+        }
     }
 
     public void SetSelectedKind(AnnotationKind? kind)
@@ -265,6 +328,7 @@ internal sealed class EditorSession
         EditorTool.Blur => "Drag box to pixelate",
         EditorTool.Redact => "Drag box to blackout",
         EditorTool.Spotlight => "Drag box to spotlight",
+        EditorTool.Magnifier => "Drag circle to magnify 2×",
         _ => ""
     };
 }

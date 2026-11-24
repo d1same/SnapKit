@@ -38,10 +38,13 @@ internal sealed class RecordHudWindow : Window
     private readonly Border _cursorChip;
     private readonly Border _micChip;
     private readonly Border _sysChip;
+    private readonly Border _countdownChip;
     private readonly TextBlock _dimsText;
     private readonly Ellipse _liveDot;
     private readonly TextBlock _liveFormat;
     private readonly TextBlock _liveTime;
+    private readonly Border _micMeterPill;
+    private readonly Ellipse _micMeterDot;
     private readonly Border _drawToggleChip;
     private readonly Border _fadeChip;
     private readonly Dictionary<AnnotationKind, Border> _drawToolChips = new();
@@ -55,6 +58,9 @@ internal sealed class RecordHudWindow : Window
     private bool _showCursor;
     private bool _recordMic;
     private bool _recordSystem;
+    private bool _useCountdown;
+    private DispatcherTimer? _countdownTimer;
+    private int _countdownLeft;
     private RegionRecorder? _recorder;
     private bool _stopping;
     private bool _pulseOn;
@@ -79,6 +85,7 @@ internal sealed class RecordHudWindow : Window
         _showCursor = state.Settings.RecordShowCursor;
         _recordMic = state.Settings.RecordMicAudio;
         _recordSystem = state.Settings.RecordSystemAudio;
+        _useCountdown = state.Settings.RecordCountdown;
         _onClosedAll = onClosedAll;
 
         Title = Brand.Name + " Recorder";
@@ -127,6 +134,13 @@ internal sealed class RecordHudWindow : Window
         {
             _recordMic = !_recordMic;
             _state.Settings.RecordMicAudio = _recordMic;
+            SavePrefs();
+            RefreshReadyState();
+        });
+        _countdownChip = ToggleChip("3-2-1", "Show a 3-second countdown before recording starts", () =>
+        {
+            _useCountdown = !_useCountdown;
+            _state.Settings.RecordCountdown = _useCountdown;
             SavePrefs();
             RefreshReadyState();
         });
@@ -179,7 +193,7 @@ internal sealed class RecordHudWindow : Window
         recBtn.MouseEnter += (_, _) => recBtn.Background = Palette.ActiveHover;
         recBtn.MouseLeave += (_, _) => recBtn.Background = Palette.ActiveSurface;
         recBtn.MouseLeftButtonDown += (_, e) => e.Handled = true;
-        recBtn.MouseLeftButtonUp += (_, e) => { e.Handled = true; StartRecording(); };
+        recBtn.MouseLeftButtonUp += (_, e) => { e.Handled = true; BeginRecording(); };
 
         var cancelBtn = IconButton(LucideIcon.Close, "Cancel  (Esc)", CancelAndClose);
 
@@ -189,6 +203,7 @@ internal sealed class RecordHudWindow : Window
         _readyRow.Children.Add(_cursorChip);
         _readyRow.Children.Add(_sysChip);
         _readyRow.Children.Add(_micChip);
+        _readyRow.Children.Add(_countdownChip);
         _readyRow.Children.Add(Hairline());
         _readyRow.Children.Add(_dimsText);
         _readyRow.Children.Add(recBtn);
@@ -227,6 +242,38 @@ internal sealed class RecordHudWindow : Window
             FontWeight = FontWeights.SemiBold,
             MinWidth = 44,
             VerticalAlignment = VerticalAlignment.Center
+        };
+
+        _micMeterDot = new Ellipse
+        {
+            Width = 7,
+            Height = 7,
+            Fill = Palette.Copied,
+            Opacity = 0.28,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0)
+        };
+        _micMeterPill = new Border
+        {
+            Background = Palette.Group,
+            BorderBrush = Palette.Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(5, 2, 6, 2),
+            Margin = new Thickness(6, 0, 2, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+            ToolTip = "Live microphone activity",
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children =
+                {
+                    _micMeterDot,
+                    LucideIcons.Create(LucideIcon.Mic, Palette.Muted, size: 11.5, strokeWidth: 1.9)
+                }
+            }
         };
 
         _drawToggleChip = ToggleIconTextChip(LucideIcon.Pen, "Draw", "Toggle live tutorial drawing over the recording area", () => SetLiveDraw(!_drawOverlay.IsDrawMode));
@@ -271,6 +318,7 @@ internal sealed class RecordHudWindow : Window
         _liveRow.Children.Add(_liveDot);
         _liveRow.Children.Add(_liveFormat);
         _liveRow.Children.Add(_liveTime);
+        _liveRow.Children.Add(_micMeterPill);
         _liveRow.Children.Add(Hairline());
         _liveRow.Children.Add(_drawToggleChip);
         _liveRow.Children.Add(_pauseChip);
@@ -383,13 +431,13 @@ internal sealed class RecordHudWindow : Window
                 }
                 else if (e.Key == Key.Enter)
                 {
-                    StartRecording();
+                    BeginRecording();
                     e.Handled = true;
                 }
             }
         };
 
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
         _timer.Tick += OnTick;
 
         SourceInitialized += (_, _) =>
@@ -399,6 +447,7 @@ internal sealed class RecordHudWindow : Window
         };
         Closed += (_, _) =>
         {
+            _countdownTimer?.Stop();
             _timer.Stop();
             _drawOverlay.SafeClose();
             _frameWindow.SafeClose();
@@ -482,10 +531,43 @@ internal sealed class RecordHudWindow : Window
         _micChip.Visibility = isMp4 ? Visibility.Visible : Visibility.Collapsed;
         PaintToggle(_sysChip, _recordSystem);
         PaintToggle(_micChip, _recordMic);
+        PaintToggle(_countdownChip, _useCountdown);
 
         int w = isMp4 ? Math.Max(16, _rawW & ~1) : _rawW;
         int h = isMp4 ? Math.Max(16, _rawH & ~1) : _rawH;
         _dimsText.Text = $"{w}×{h}";
+    }
+
+    private void BeginRecording()
+    {
+        if (_recorder != null || _countdownTimer != null)
+            return;
+
+        if (!_useCountdown)
+        {
+            StartRecording();
+            return;
+        }
+
+        _readyRow.IsEnabled = false;
+        _countdownLeft = 3;
+        _frameWindow.ShowCountdown(_countdownLeft);
+        _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _countdownTimer.Tick += (_, _) =>
+        {
+            _countdownLeft--;
+            if (_countdownLeft > 0)
+            {
+                _frameWindow.ShowCountdown(_countdownLeft);
+                return;
+            }
+            _countdownTimer?.Stop();
+            _countdownTimer = null;
+            _frameWindow.ShowCountdown(0);
+            _readyRow.IsEnabled = true;
+            StartRecording();
+        };
+        _countdownTimer.Start();
     }
 
     private void StartRecording()
@@ -524,6 +606,7 @@ internal sealed class RecordHudWindow : Window
             _liveContainer.Visibility = Visibility.Visible;
             _liveFormat.Text = _format == RecordingFormat.Gif ? "GIF" : "MP4";
             _liveTime.Text = "00:00";
+            _micMeterPill.Visibility = (_format == RecordingFormat.Mp4 && _recordMic) ? Visibility.Visible : Visibility.Collapsed;
             _frameWindow.SetRecordingState(recording: true, paused: false);
             _timer.Start();
         }
@@ -590,16 +673,26 @@ internal sealed class RecordHudWindow : Window
         if (!_recorder.IsPaused)
         {
             _pulseOn = !_pulseOn;
-            _liveDot.Opacity = _pulseOn ? 1.0 : 0.35;
+            _liveDot.Opacity = _pulseOn ? 1.0 : 0.45;
+            if (_micMeterPill.Visibility == Visibility.Visible)
+            {
+                float lvl = _recorder.CurrentMicLevel;
+                _micMeterDot.Opacity = Math.Clamp(0.25 + lvl * 0.75, 0.25, 1.0);
+                _micMeterDot.Fill = lvl > 0.08f ? Palette.Copied : Palette.Muted;
+            }
         }
         else
         {
             _liveDot.Opacity = 0.6;
+            _micMeterDot.Opacity = 0.25;
         }
     }
 
     private void CancelAndClose()
     {
+        _countdownTimer?.Stop();
+        _countdownTimer = null;
+        _frameWindow.ShowCountdown(0);
         _frameWindow.SafeClose();
         Close();
     }
@@ -801,6 +894,8 @@ internal sealed class RecordHudWindow : Window
         private const int FramePad = 3;
         private readonly Rectangle _dash;
         private readonly Canvas _blurGuides;
+        private readonly Border _countdownBadge;
+        private readonly TextBlock _countdownText;
         private readonly MonitorInfo _monitor;
         private readonly int _x;
         private readonly int _y;
@@ -835,6 +930,29 @@ internal sealed class RecordHudWindow : Window
                 SnapsToDevicePixels = true
             };
             _blurGuides = new Canvas { IsHitTestVisible = false };
+            _countdownText = new TextBlock
+            {
+                Text = "3",
+                Foreground = Palette.TextBright,
+                FontFamily = Palette.Font,
+                FontSize = 44,
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _countdownBadge = new Border
+            {
+                Width = 92,
+                Height = 92,
+                CornerRadius = new CornerRadius(46),
+                Background = Palette.Freeze(0x15, 0x15, 0x15, 0xDC),
+                BorderBrush = Palette.LineStrong,
+                BorderThickness = new Thickness(1.5),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed,
+                Child = _countdownText
+            };
             Content = new Grid
             {
                 Children =
@@ -846,7 +964,8 @@ internal sealed class RecordHudWindow : Window
                         StrokeThickness = 3,
                         Fill = Brushes.Transparent
                     },
-                    _dash
+                    _dash,
+                    _countdownBadge
                 }
             };
 
@@ -863,6 +982,17 @@ internal sealed class RecordHudWindow : Window
                     NativeMethods.SetWindowDisplayAffinity(hwnd, NativeMethods.WdaExcludeFromCapture);
                 }
             };
+        }
+
+        public void ShowCountdown(int secondsLeft)
+        {
+            if (secondsLeft <= 0)
+            {
+                _countdownBadge.Visibility = Visibility.Collapsed;
+                return;
+            }
+            _countdownText.Text = secondsLeft.ToString();
+            _countdownBadge.Visibility = Visibility.Visible;
         }
 
         public void SetBlurGuides(IReadOnlyList<Rect> dipRects)

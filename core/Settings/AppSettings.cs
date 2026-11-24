@@ -40,11 +40,13 @@ public sealed class AppSettings
     public double LastFontSize { get; set; } = 18;
     public ShapeFillMode LastFillMode { get; set; } = ShapeFillMode.Outline;
     public BackdropPreset LastBackdrop { get; set; } = BackdropPreset.None;
+    public bool ShowTicketStamp { get; set; }
 
     // Persisted recording defaults
     public bool RecordShowCursor { get; set; } = true;
     public bool RecordMicAudio { get; set; }
     public bool RecordSystemAudio { get; set; } = true;
+    public bool RecordCountdown { get; set; } = true;
     public int RecordVideoFps { get; set; } = 30;
     public int RecordGifFps { get; set; } = 12;
 

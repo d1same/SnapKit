@@ -26,10 +26,12 @@ internal static class NativeMethods
     public const int GaRoot = 2;
     public const int SwRestore = 9;
     public const int WhKeyboardLl = 13;
+    public const int WhMouseLl = 14;
     public const int WmKeyDown = 0x0100;
     public const int WmKeyUp = 0x0101;
     public const int WmSysKeyDown = 0x0104;
     public const int WmSysKeyUp = 0x0105;
+    public const int WmLButtonDown = 0x0201;
     public const int WmHotkey = 0x0312;
     public const int WmSettingChange = 0x001A;
     public const uint LlkhfInjected = 0x10;

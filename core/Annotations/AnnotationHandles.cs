@@ -35,6 +35,7 @@ public static class AnnotationHandles
             case AnnotationKind.Blur:
             case AnnotationKind.Redact:
             case AnnotationKind.Spotlight:
+            case AnnotationKind.Magnifier:
                 var (x, y, w, h) = ShapeMath.Bounds(annotation.Points);
                 return new[]
                 {

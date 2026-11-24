@@ -179,7 +179,7 @@ internal sealed class ShotSurface : Grid
         foreach (var annotation in Document.Annotations)
         {
             bool hideText = _editing != null && annotation.Id == _editing.Id;
-            AnnotationPainter.Draw(dc, annotation, hideText);
+            AnnotationPainter.Draw(dc, annotation, hideText, _image.Source, Document.View);
             if (_selected == annotation.Id)
                 DrawSelection(dc, annotation);
         }
@@ -188,10 +188,10 @@ internal sealed class ShotSurface : Grid
             if (_draft.Kind == AnnotationKind.Blur || _cropping)
                 DrawDraftBox(dc, _draft);
             else
-                AnnotationPainter.Draw(dc, _draft, _editing != null && _draft.Id == _editing.Id);
+                AnnotationPainter.Draw(dc, _draft, _editing != null && _draft.Id == _editing.Id, _image.Source, Document.View);
         }
         if (_editing != null && _editIsNew)
-            AnnotationPainter.Draw(dc, _editing, hideText: true);
+            AnnotationPainter.Draw(dc, _editing, hideText: true, _image.Source, Document.View);
         AnnotationPainter.DrawSpotlight(dc, Document, _draft);
         dc.Pop();
         dc.Pop();
@@ -590,6 +590,7 @@ internal sealed class ShotSurface : Grid
             EditorTool.Blur => AnnotationKind.Blur,
             EditorTool.Redact => AnnotationKind.Redact,
             EditorTool.Spotlight => AnnotationKind.Spotlight,
+            EditorTool.Magnifier => AnnotationKind.Magnifier,
             EditorTool.Crop => AnnotationKind.Rectangle,
             _ => AnnotationKind.Pen
         },
@@ -615,7 +616,7 @@ internal sealed class ShotSurface : Grid
     {
         if (color != null && mark.Kind != AnnotationKind.Blur)
             mark.ColorHex = HexColor.Normalize(color, mark.ColorHex);
-        if (stroke != null && mark.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur)
+        if (stroke != null && mark.Kind is AnnotationKind.Pen or AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Highlighter or AnnotationKind.Blur or AnnotationKind.Magnifier)
             mark.Stroke = Math.Clamp(stroke.Value, 1, 16);
         if (font != null && mark.Kind is AnnotationKind.Text or AnnotationKind.Callout or AnnotationKind.Number)
             mark.FontSize = Math.Clamp(font.Value, 8, 72);
@@ -627,6 +628,8 @@ internal sealed class ShotSurface : Grid
 
     private PointD Constrain(PointD start, PointD end)
     {
+        if (_draft?.Kind == AnnotationKind.Magnifier)
+            return ShapeMath.ConstrainSquare(start, end);
         if (Keyboard.Modifiers != ModifierKeys.Shift)
             return end;
         return _draft?.Kind is AnnotationKind.Line or AnnotationKind.Arrow or AnnotationKind.Pen or AnnotationKind.Highlighter

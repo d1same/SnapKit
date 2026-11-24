@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -19,6 +20,13 @@ internal static class ShotRenderer
         // through a render target shifts its colors.
         if (HasMarks(document))
         {
+            BitmapSource? underlayBitmap = null;
+            if (document.Annotations.Any(a => a.Kind == AnnotationKind.Magnifier))
+            {
+                underlayBitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4);
+                underlayBitmap.Freeze();
+            }
+
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
@@ -27,7 +35,7 @@ internal static class ShotRenderer
                 {
                     if (annotation.Kind is AnnotationKind.Blur or AnnotationKind.Spotlight)
                         continue;
-                    AnnotationPainter.Draw(dc, annotation);
+                    AnnotationPainter.Draw(dc, annotation, hideText: false, underlay: underlayBitmap, view: document.View);
                 }
                 AnnotationPainter.DrawSpotlight(dc, document, null);
                 dc.Pop();
@@ -43,9 +51,16 @@ internal static class ShotRenderer
         var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4);
         bitmap.Freeze();
 
-        return document.Backdrop == BackdropPreset.None
-            ? bitmap
-            : ApplyBackdrop(bitmap, document.Backdrop);
+        string? stamp = document.ShowStamp
+            ? TicketStamp.Format(DateTime.Now, document.StampNote, Environment.MachineName)
+            : null;
+
+        if (document.Backdrop != BackdropPreset.None)
+            return ApplyBackdrop(bitmap, document.Backdrop, stamp);
+
+        return stamp != null
+            ? ApplyStampFooter(bitmap, stamp)
+            : bitmap;
     }
 
     public static (Brush Background, Brush Border) PreviewBrushes(BackdropPreset preset) => preset switch
@@ -62,9 +77,11 @@ internal static class ShotRenderer
         _ => (Brushes.Transparent, Brushes.Transparent)
     };
 
-    private static BitmapSource ApplyBackdrop(BitmapSource shot, BackdropPreset preset)
+    private static BitmapSource ApplyBackdrop(BitmapSource shot, BackdropPreset preset, string? stamp)
     {
         var metrics = BackdropLayout.Measure(preset, shot.PixelWidth, shot.PixelHeight);
+        int padBottom = stamp != null ? Math.Max(metrics.PadBottom, 34) : metrics.PadBottom;
+        int totalH = shot.PixelHeight + metrics.PadTop + padBottom;
         var (bg, borderBrush) = PreviewBrushes(preset);
         var shotRect = new Rect(metrics.PadX, metrics.PadTop, shot.PixelWidth, shot.PixelHeight);
 
@@ -72,7 +89,7 @@ internal static class ShotRenderer
         using (var dc = visual.RenderOpen())
         {
             // Outer documentation canvas background
-            dc.DrawRectangle(bg, null, new Rect(0, 0, metrics.TotalWidth, metrics.TotalHeight));
+            dc.DrawRectangle(bg, null, new Rect(0, 0, metrics.TotalWidth, totalH));
 
             // Soft layered drop shadow behind the screenshot card
             var shadowBase = preset == BackdropPreset.Clean
@@ -92,9 +109,63 @@ internal static class ShotRenderer
             var borderPen = new Pen(borderBrush, 1);
             borderPen.Freeze();
             dc.DrawRoundedRectangle(null, borderPen, new Rect(shotRect.X + 0.5, shotRect.Y + 0.5, Math.Max(1, shotRect.Width - 1), Math.Max(1, shotRect.Height - 1)), metrics.CornerRadius, metrics.CornerRadius);
+
+            // Subtle proof timestamp in bottom margin of the frame
+            if (!string.IsNullOrWhiteSpace(stamp))
+            {
+                var ink = preset == BackdropPreset.Clean
+                    ? Palette.Freeze(0x47, 0x55, 0x69)
+                    : Palette.Freeze(0xD4, 0xD4, 0xD8, 0xCC);
+                var ft = new FormattedText(
+                    stamp,
+                    CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface(Palette.Mono, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal),
+                    11,
+                    ink,
+                    1.0);
+                double tx = Math.Max(metrics.PadX, shotRect.Right - ft.Width);
+                double ty = shotRect.Bottom + Math.Max(6, (padBottom - ft.Height) * 0.5);
+                dc.DrawText(ft, new Point(tx, ty));
+            }
         }
 
-        var target = new RenderTargetBitmap(metrics.TotalWidth, metrics.TotalHeight, 96, 96, PixelFormats.Pbgra32);
+        var target = new RenderTargetBitmap(metrics.TotalWidth, totalH, 96, 96, PixelFormats.Pbgra32);
+        target.Render(visual);
+        var converted = new FormatConvertedBitmap(target, PixelFormats.Bgra32, null, 0);
+        converted.Freeze();
+        return converted;
+    }
+
+    private static BitmapSource ApplyStampFooter(BitmapSource shot, string stamp)
+    {
+        const int footerH = 28;
+        int w = shot.PixelWidth;
+        int totalH = shot.PixelHeight + footerH;
+
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawImage(shot, new Rect(0, 0, w, shot.PixelHeight));
+            dc.DrawRectangle(Palette.Group, null, new Rect(0, shot.PixelHeight, w, footerH));
+            var linePen = new Pen(Palette.Line, 1);
+            linePen.Freeze();
+            dc.DrawLine(linePen, new Point(0, shot.PixelHeight + 0.5), new Point(w, shot.PixelHeight + 0.5));
+
+            var ft = new FormattedText(
+                stamp,
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(Palette.Mono, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal),
+                11,
+                Palette.Muted,
+                1.0);
+            double tx = Math.Max(10, w - ft.Width - 10);
+            double ty = shot.PixelHeight + Math.Max(4, (footerH - ft.Height) * 0.5);
+            dc.DrawText(ft, new Point(tx, ty));
+        }
+
+        var target = new RenderTargetBitmap(w, totalH, 96, 96, PixelFormats.Pbgra32);
         target.Render(visual);
         var converted = new FormatConvertedBitmap(target, PixelFormats.Bgra32, null, 0);
         converted.Freeze();

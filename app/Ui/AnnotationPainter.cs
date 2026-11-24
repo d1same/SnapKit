@@ -6,7 +6,7 @@ namespace SnapKit;
 
 internal static class AnnotationPainter
 {
-    public static void Draw(DrawingContext dc, Annotation annotation, bool hideText = false)
+    public static void Draw(DrawingContext dc, Annotation annotation, bool hideText = false, ImageSource? underlay = null, IntRect? view = null)
     {
         if (annotation.Points.Count == 0 || annotation.Kind is AnnotationKind.Blur or AnnotationKind.Spotlight)
             return;
@@ -46,7 +46,63 @@ internal static class AnnotationPainter
             case AnnotationKind.Number:
                 DrawNumber(dc, annotation, fill);
                 break;
+            case AnnotationKind.Magnifier:
+                DrawMagnifier(dc, annotation, underlay, view);
+                break;
         }
+    }
+
+    private static void DrawMagnifier(DrawingContext dc, Annotation annotation, ImageSource? underlay, IntRect? view)
+    {
+        var rect = Box(annotation);
+        double diameter = Math.Min(rect.Width, rect.Height);
+        if (diameter < 10)
+            return;
+        double radius = diameter * 0.5;
+        var center = new Point(rect.X + rect.Width * 0.5, rect.Y + rect.Height * 0.5);
+
+        // Soft drop shadow behind the circular loupe
+        var shadowBrush = Palette.Freeze(0, 0, 0, 0x48);
+        dc.DrawEllipse(shadowBrush, null, new Point(center.X, center.Y + 4), radius + 3, radius + 3);
+        dc.DrawEllipse(Palette.Freeze(0, 0, 0, 0x26), null, new Point(center.X, center.Y + 6), radius + 6, radius + 6);
+
+        // 2x zoomed interior clipped to the loupe circle
+        var clip = new EllipseGeometry(center, radius, radius);
+        clip.Freeze();
+        dc.PushClip(clip);
+        dc.DrawEllipse(Palette.Bg, null, center, radius, radius);
+
+        if (underlay != null && view is { Width: > 0, Height: > 0 } v)
+        {
+            const double zoom = 2.0;
+            double localCx = center.X - v.X;
+            double localCy = center.Y - v.Y;
+            double srcRadius = radius / zoom;
+            double srcX = localCx - srcRadius;
+            double srcY = localCy - srcRadius;
+            double srcW = srcRadius * 2.0;
+            double srcH = srcRadius * 2.0;
+
+            var brush = new ImageBrush(underlay)
+            {
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewbox = new Rect(srcX, srcY, srcW, srcH),
+                Stretch = Stretch.Fill
+            };
+            RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
+            brush.Freeze();
+            dc.DrawEllipse(brush, null, center, radius, radius);
+        }
+        dc.Pop();
+
+        // Crisp inner white glass rim + outer colored stroke
+        double ringWidth = Math.Clamp(annotation.Stroke, 2, 8);
+        var innerPen = new Pen(Palette.Freeze(255, 255, 255, 0xDD), 1.5);
+        innerPen.Freeze();
+        var outerPen = new Pen(Palette.Brush(annotation.ColorHex), ringWidth);
+        outerPen.Freeze();
+        dc.DrawEllipse(null, innerPen, center, Math.Max(1, radius - ringWidth * 0.5 - 0.5), Math.Max(1, radius - ringWidth * 0.5 - 0.5));
+        dc.DrawEllipse(null, outerPen, center, radius, radius);
     }
 
     private static void DrawShapeBox(DrawingContext dc, Annotation annotation, bool ellipse)

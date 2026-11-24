@@ -8,6 +8,8 @@ internal sealed class TrayHost : IDisposable
 {
     private static readonly Font MenuFont = new("Segoe UI", 9.5f, FontStyle.Regular);
     private static readonly Font MenuFontBold = new("Segoe UI", 9.5f, FontStyle.Bold);
+    private static readonly Font HeaderFont = new("Segoe UI", 7.8f, FontStyle.Bold);
+    private const string SectionHeaderTag = "SECTION_HEADER";
 
     private readonly AppState _state;
     private readonly NotifyIcon _icon;
@@ -20,6 +22,7 @@ internal sealed class TrayHost : IDisposable
     private readonly ToolStripMenuItem _ocrItem;
     private readonly ToolStripMenuItem _recordVideoItem;
     private readonly ToolStripMenuItem _recordGifItem;
+    private readonly ToolStripMenuItem _combineItem;
     private readonly ToolStripMenuItem _recent;
     private readonly ToolStripMenuItem _updateItem;
     private Icon _currentIcon;
@@ -31,33 +34,52 @@ internal sealed class TrayHost : IDisposable
         _menu = CreatePopupMenu();
         _menu.Opening += (_, _) => RebuildDynamicItems();
 
-        _areaItem = Add("Area", () => state.Coordinator.Start(CaptureAction.Area));
+        // ── CAPTURE ────────────────────────────────────────────────────────────
+        _menu.Items.Add(SectionHeader("CAPTURE"));
+        _areaItem = Add("Capture area", () => state.Coordinator.Start(CaptureAction.Area));
+        _areaItem.Font = MenuFontBold;
+        _ocrItem = Add("Capture text / table (OCR)", () => state.Coordinator.Start(CaptureAction.Ocr));
+
+        var moreCaptures = SubmenuItem("More captures");
+        _windowItem = Item("Window", () => state.Coordinator.Start(CaptureAction.Window));
+        _fullScreenItem = Item("Full screen", () => state.Coordinator.Start(CaptureAction.FullScreen));
+        var allMonitors = Item("All monitors", () => state.Coordinator.StartAllMonitors());
+        _scrollingItem = Item("Scrolling capture", () => state.Coordinator.Start(CaptureAction.Scrolling));
         _repeatLast = Item("Repeat last area", () => state.Coordinator.StartRepeatLastArea(), withDisabled: true);
-        _menu.Items.Add(_repeatLast);
-        _windowItem = Add("Window", () => state.Coordinator.Start(CaptureAction.Window));
-        _fullScreenItem = Add("Full screen", () => state.Coordinator.Start(CaptureAction.FullScreen));
-        Add("All monitors", () => state.Coordinator.StartAllMonitors());
-        _scrollingItem = Add("Scrolling capture", () => state.Coordinator.Start(CaptureAction.Scrolling));
 
         var delayed = SubmenuItem("Delayed capture");
         delayed.DropDownItems.Add(Item("3 seconds", () => state.Coordinator.StartDelayed(3)));
         delayed.DropDownItems.Add(Item("5 seconds", () => state.Coordinator.StartDelayed(5)));
         delayed.DropDownItems.Add(Item("10 seconds", () => state.Coordinator.StartDelayed(10)));
-        _menu.Items.Add(delayed);
 
-        _ocrItem = Add("OCR", () => state.Coordinator.Start(CaptureAction.Ocr));
+        moreCaptures.DropDownItems.Add(_windowItem);
+        moreCaptures.DropDownItems.Add(_fullScreenItem);
+        moreCaptures.DropDownItems.Add(allMonitors);
+        moreCaptures.DropDownItems.Add(new ToolStripSeparator());
+        moreCaptures.DropDownItems.Add(_scrollingItem);
+        moreCaptures.DropDownItems.Add(_repeatLast);
+        moreCaptures.DropDownItems.Add(delayed);
+        _menu.Items.Add(moreCaptures);
+
+        // ── TUTORIALS & RECORDING ──────────────────────────────────────────────
         _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add(SectionHeader("TUTORIALS & RECORDING"));
         _recordVideoItem = Add("Record video (MP4)", () => state.Coordinator.Start(CaptureAction.RecordVideo));
         _recordGifItem = Add("Record GIF", () => state.Coordinator.Start(CaptureAction.RecordGif));
-        _menu.Items.Add(new ToolStripSeparator());
+        Add("Step-by-step guide…", () => RunOnWpf(() => StepGuideRecorder.Launch(_state)));
 
+        // ── TOOLS ──────────────────────────────────────────────────────────────
+        _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add(SectionHeader("TOOLS"));
+        _combineItem = Add("Combine recent shots…", () => RunOnWpf(() => CombineShotsWindow.Launch(_state)));
         _recent = SubmenuItem("Recent captures");
         _menu.Items.Add(_recent);
-        _menu.Items.Add(new ToolStripSeparator());
 
+        // ── APP ────────────────────────────────────────────────────────────────
+        _menu.Items.Add(new ToolStripSeparator());
+        Add("Settings & Shortcuts", ShowSettings);
         _updateItem = Item("Check for updates…", OnUpdateClicked);
         _menu.Items.Add(_updateItem);
-        Add("Settings / Shortcuts", ShowSettings);
         Add("Exit", Failsafe.Kill);
 
         _currentIcon = IconFactory.Load();
@@ -77,6 +99,15 @@ internal sealed class TrayHost : IDisposable
         if (UpdateCheck.Available is { } existing)
             OnUpdateAvailable(existing);
         TrayPromoter.KeepBesideClock(RefreshIcon);
+    }
+
+    private static void RunOnWpf(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+            action();
+        else
+            dispatcher.BeginInvoke(action);
     }
 
     private void OnUpdateAvailable(ReleaseInfo info)
@@ -170,15 +201,18 @@ internal sealed class TrayHost : IDisposable
 
     private void ShowSettings()
     {
-        foreach (System.Windows.Window window in System.Windows.Application.Current.Windows)
+        RunOnWpf(() =>
         {
-            if (window is SettingsWindow settings)
+            foreach (System.Windows.Window window in System.Windows.Application.Current.Windows)
             {
-                settings.Activate();
-                return;
+                if (window is SettingsWindow settings)
+                {
+                    settings.Activate();
+                    return;
+                }
             }
-        }
-        new SettingsWindow(_state).Show();
+            new SettingsWindow(_state).Show();
+        });
     }
 
     private void RebuildDynamicItems()
@@ -204,8 +238,12 @@ internal sealed class TrayHost : IDisposable
             _repeatLast.Text = "Repeat last area";
         }
 
+        int count = _state.Recent.Items.Count;
+        _recent.Text = count > 0 ? $"Recent captures ({count})" : "Recent captures";
+        _combineItem.Text = count >= 2 ? "Combine recent shots…" : "Combine recent shots… (need 2+)";
+
         _recent.DropDownItems.Clear();
-        if (_state.Recent.Items.Count == 0)
+        if (count == 0)
         {
             _recent.DropDownItems.Add(Item("Nothing captured yet", () => { }, withDisabled: true));
             return;
@@ -213,10 +251,12 @@ internal sealed class TrayHost : IDisposable
         foreach (var capture in _state.Recent.Items)
         {
             var item = capture;
-            _recent.DropDownItems.Add(Item(item.Label, () => EditorWindow.Open(item.Image, item, _state)));
+            _recent.DropDownItems.Add(Item(item.Label, () => RunOnWpf(() => EditorWindow.Open(item.Image, item, _state))));
         }
         _recent.DropDownItems.Add(new ToolStripSeparator());
-        _recent.DropDownItems.Add(Item("Clear", () => _state.Recent.Clear()));
+        if (count >= 2)
+            _recent.DropDownItems.Add(Item("Combine shots (Before / After)…", () => RunOnWpf(() => CombineShotsWindow.Launch(_state))));
+        _recent.DropDownItems.Add(Item("Clear recent list", () => _state.Recent.Clear()));
     }
 
     private void ApplyShortcut(ToolStripMenuItem item, CaptureAction action)
@@ -239,6 +279,15 @@ internal sealed class TrayHost : IDisposable
         AttachRoundedChrome(menu);
         return menu;
     }
+
+    private static ToolStripMenuItem SectionHeader(string title) => new(title)
+    {
+        Enabled = false,
+        Tag = SectionHeaderTag,
+        Font = HeaderFont,
+        ForeColor = Color.FromArgb(120, 120, 120),
+        Padding = new Padding(4, 4, 6, 2)
+    };
 
     private static ToolStripMenuItem SubmenuItem(string text)
     {
@@ -299,6 +348,7 @@ internal sealed class TrayHost : IDisposable
         private static readonly Color HoverBorder = Color.FromArgb(62, 62, 62);
         private static readonly Color TextPrimary = Color.FromArgb(242, 242, 242);
         private static readonly Color TextMuted = Color.FromArgb(138, 138, 138);
+        private static readonly Color TextHeader = Color.FromArgb(116, 116, 116);
         private static readonly Color TextDisabled = Color.FromArgb(102, 102, 102);
 
         public DarkMenuRenderer() : base(new DarkColors())
@@ -367,11 +417,14 @@ internal sealed class TrayHost : IDisposable
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
+            bool isHeader = Equals(e.Item.Tag, SectionHeaderTag);
             bool isShortcut = e.Item is ToolStripMenuItem mi
                 && !string.IsNullOrEmpty(mi.ShortcutKeyDisplayString)
                 && string.Equals(e.Text, mi.ShortcutKeyDisplayString, StringComparison.Ordinal);
 
-            if (!e.Item.Enabled)
+            if (isHeader)
+                e.TextColor = TextHeader;
+            else if (!e.Item.Enabled)
                 e.TextColor = TextDisabled;
             else if (isShortcut)
                 e.TextColor = TextMuted;

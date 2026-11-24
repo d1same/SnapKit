@@ -35,6 +35,8 @@ internal sealed class RegionRecorder : IScreenRecorder
     public bool IsPaused => _paused;
     public TimeSpan Elapsed => TimeSpan.FromMilliseconds(Volatile.Read(ref _elapsedMs));
     public int FramesCaptured => Volatile.Read(ref _frames);
+    public bool HasActiveMic => _mic != null;
+    public float CurrentMicLevel => _mic?.PeakLevel ?? 0f;
 
     public void SetLiveBlurRegions(IReadOnlyList<IntRect> regions)
     {

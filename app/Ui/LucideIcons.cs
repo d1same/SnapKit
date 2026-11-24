@@ -45,7 +45,13 @@ internal enum LucideIcon
     Sparkles,
     Check,
     Table,
-    AlignLeft
+    AlignLeft,
+    Loupe,
+    Shield,
+    Stamp,
+    ListOrdered,
+    Columns,
+    Timer
 }
 
 /// <summary>
@@ -391,6 +397,51 @@ internal static class LucideIcons
                 Line(4, 6, 20, 6);
                 Line(4, 12, 14, 12);
                 Line(4, 18, 18, 18);
+                break;
+
+            // Lucide: search (zoom loupe)
+            case LucideIcon.Loupe:
+                Circle(11, 11, 7.5);
+                Line(16.6, 16.6, 21, 21);
+                Line(8.5, 11, 13.5, 11);
+                Line(11, 8.5, 11, 13.5);
+                break;
+
+            // Lucide: shield (auto-blur PII)
+            case LucideIcon.Shield:
+                Path("M 12 22 C 12 22 20 18 20 12 V 5 L 12 2 L 4 5 V 12 C 4 18 12 22 12 22 Z");
+                Line(9, 12, 11, 14);
+                Line(11, 14, 15, 10);
+                break;
+
+            // Lucide: clock (ticket proof stamp)
+            case LucideIcon.Stamp:
+                Circle(12, 12, 9);
+                Line(12, 7, 12, 12);
+                Line(12, 12, 15.5, 14);
+                break;
+
+            // Lucide: list-ordered (step-by-step guide)
+            case LucideIcon.ListOrdered:
+                Line(10, 6, 21, 6);
+                Line(10, 12, 21, 12);
+                Line(10, 18, 21, 18);
+                Line(4, 6, 6, 6);
+                Line(4, 12, 6, 12);
+                Line(4, 18, 6, 18);
+                break;
+
+            // Lucide: columns-2 (combine shots)
+            case LucideIcon.Columns:
+                Rect(3, 4, 18, 16, rx: 2);
+                Line(12, 4, 12, 20);
+                break;
+
+            // Lucide: timer (3-2-1 countdown)
+            case LucideIcon.Timer:
+                Line(10, 2, 14, 2);
+                Line(12, 14, 15, 11);
+                Circle(12, 14, 8);
                 break;
         }
 

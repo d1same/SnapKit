@@ -16,7 +16,10 @@ internal static class ShotMenu
         Action onClose)
     {
         var menu = DarkMenu.Create();
-        menu.Items.Add(DarkMenu.Item("Copy", () =>
+
+        // ── Share & Save ───────────────────────────────────────────────────────
+        menu.Items.Add(DarkMenu.SectionHeader("Share & Save"));
+        menu.Items.Add(DarkMenu.Item("Copy image", () =>
         {
             surface.CommitEditing();
             owner.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(session.Copy));
@@ -31,31 +34,50 @@ internal static class ShotMenu
             surface.CommitEditing();
             owner.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => session.Save(owner)));
         }, "Ctrl+S"));
+
+        // ── Smart Tools ────────────────────────────────────────────────────────
         menu.Items.Add(DarkMenu.Separator());
-        menu.Items.Add(DarkMenu.Item("Copy Text (OCR)", () =>
+        menu.Items.Add(DarkMenu.SectionHeader("Smart Tools"));
+        menu.Items.Add(DarkMenu.Item("Copy text / table (OCR)", () =>
         {
             surface.CommitEditing();
             onOcr();
         }));
-        menu.Items.Add(DarkMenu.Item("Pin", () =>
+        menu.Items.Add(DarkMenu.Item("Auto-blur sensitive info", () =>
+        {
+            surface.CommitEditing();
+            session.AutoBlurSensitive(useRedact: false);
+        }));
+        menu.Items.Add(DarkMenu.Item("Pin floating on top", () =>
         {
             surface.CommitEditing();
             onPin();
         }));
-        var toggleFrame = DarkMenu.Item("Toggle Frame", () =>
-        {
-            var next = session.Document.Backdrop switch
-            {
-                BackdropPreset.None => BackdropPreset.Clean,
-                BackdropPreset.Clean => BackdropPreset.Dark,
-                BackdropPreset.Dark => BackdropPreset.Slate,
-                _ => BackdropPreset.None
-            };
-            session.SetBackdrop(next);
-        });
-        menu.Items.Add(toggleFrame);
+
+        // ── Appearance ─────────────────────────────────────────────────────────
         menu.Items.Add(DarkMenu.Separator());
-        menu.Items.Add(DarkMenu.Item("Clear Marks", () =>
+        menu.Items.Add(DarkMenu.SectionHeader("Appearance"));
+
+        var frameMenu = DarkMenu.Submenu("Frame", "Off");
+        var frameOff = DarkMenu.Item("Off", () => session.SetBackdrop(BackdropPreset.None));
+        var frameClean = DarkMenu.Item("Clean (Light)", () => session.SetBackdrop(BackdropPreset.Clean));
+        var frameDark = DarkMenu.Item("Dark", () => session.SetBackdrop(BackdropPreset.Dark));
+        var frameSlate = DarkMenu.Item("Slate", () => session.SetBackdrop(BackdropPreset.Slate));
+        frameMenu.Items.Add(frameOff);
+        frameMenu.Items.Add(frameClean);
+        frameMenu.Items.Add(frameDark);
+        frameMenu.Items.Add(frameSlate);
+        menu.Items.Add(frameMenu);
+
+        var stampItem = DarkMenu.Item("Ticket proof stamp", () =>
+        {
+            session.SetStamp(!session.Document.ShowStamp);
+        }, "Off");
+        menu.Items.Add(stampItem);
+
+        // ── Cleanup ────────────────────────────────────────────────────────────
+        menu.Items.Add(DarkMenu.Separator());
+        menu.Items.Add(DarkMenu.Item("Clear all marks", () =>
         {
             surface.CommitEditing();
             session.ClearAll();
@@ -67,10 +89,16 @@ internal static class ShotMenu
         {
             pause?.Dispose();
             pause = ClickAway.Pause(owner);
-            string frameState = session.Document.Backdrop == BackdropPreset.None
-                ? "Off"
-                : session.Document.Backdrop.ToString();
-            DarkMenu.SetLabel(toggleFrame, "Toggle Frame", frameState);
+
+            var cur = session.Document.Backdrop;
+            string frameState = cur == BackdropPreset.None ? "Off" : cur.ToString();
+            DarkMenu.SetLabel(frameMenu, "Frame", frameState);
+            DarkMenu.SetLabel(frameOff, "Off", cur == BackdropPreset.None ? "✓" : null);
+            DarkMenu.SetLabel(frameClean, "Clean (Light)", cur == BackdropPreset.Clean ? "✓" : null);
+            DarkMenu.SetLabel(frameDark, "Dark", cur == BackdropPreset.Dark ? "✓" : null);
+            DarkMenu.SetLabel(frameSlate, "Slate", cur == BackdropPreset.Slate ? "✓" : null);
+
+            DarkMenu.SetLabel(stampItem, "Ticket proof stamp", session.Document.ShowStamp ? "On" : "Off");
         };
         menu.Closed += (_, _) =>
         {

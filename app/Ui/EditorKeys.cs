@@ -157,6 +157,7 @@ internal static class EditorKeys
             Key.B => EditorTool.Blur,
             Key.D => EditorTool.Redact,
             Key.S => EditorTool.Spotlight,
+            Key.M => EditorTool.Magnifier,
             Key.X => EditorTool.Crop,
             Key.I => EditorTool.Picker,
             _ => null

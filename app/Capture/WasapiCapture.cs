@@ -14,6 +14,9 @@ internal sealed class WasapiCapture : IDisposable
     private IAudioClient? _client;
     private IAudioCaptureClient? _capture;
     private bool _running;
+    private float _level;
+
+    public float PeakLevel => Volatile.Read(ref _level);
 
     private WasapiCapture(IAudioClient client, IAudioCaptureClient capture)
     {
@@ -150,7 +153,23 @@ internal sealed class WasapiCapture : IDisposable
                         var chunk = new byte[byteCount];
                         bool silent = (flags & 0x2u) != 0; // AUDCLNT_BUFFERFLAGS_SILENT
                         if (!silent && data != IntPtr.Zero)
+                        {
                             Marshal.Copy(data, chunk, 0, byteCount);
+                            int peak = 0;
+                            for (int i = 0; i + 1 < byteCount; i += 8)
+                            {
+                                short sample = (short)(chunk[i] | (chunk[i + 1] << 8));
+                                int mag = sample == short.MinValue ? 32767 : Math.Abs(sample);
+                                if (mag > peak) peak = mag;
+                            }
+                            float norm = Math.Clamp(peak / 24000f, 0f, 1f);
+                            float prev = Volatile.Read(ref _level);
+                            Volatile.Write(ref _level, Math.Max(norm, prev * 0.65f));
+                        }
+                        else
+                        {
+                            Volatile.Write(ref _level, Volatile.Read(ref _level) * 0.5f);
+                        }
                         lock (_lock)
                         {
                             // Prevent unbounded lag if writer falls behind

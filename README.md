@@ -6,23 +6,24 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 ### Everyday ideas
 
-- **PR & changelog walkthroughs** — Record a 5-second **GIF** (`Ctrl+Alt+G`) with click highlight rings and a live arrow, press `Ctrl+C`, and paste the `.gif` directly into GitHub, Slack, or Discord.
-- **Safe bug reports** — Pixelate `.env` secrets or redact customer emails with `B` / `D` in one drag before pasting into a ticket, or turn on **Live Blur** while recording video.
-- **Instant docs graphics** — Drop `1` `2` `3` step badges (`N`), add a callout (`C`), flip **Frame** to **Slate** or **Clean**, and copy a presentation-ready image with a soft drop shadow.
-- **Copy text from locked dialogs or videos** — Press `Ctrl+Shift+O`, drag across any error log or screenshot, and grab clean text offline.
-- **Floating cheat sheets** — **Pin** a design palette, SQL schema, or terminal reference at 85% opacity while you work.
+- **Step-by-step client guides** — Pick **Step-by-step guide…** from the tray, click through any fix, edit the 1-line captions, and **Copy as Image** or **Copy for Email / Docs (HTML)** straight into a ticket reply or Outlook email.
+- **PR & changelog walkthroughs** — Record a 5-second **GIF** (`Ctrl+Alt+G`) or **MP4** (`Ctrl+Alt+V`) with a `3-2-1` countdown, click highlight rings, live mic meter, and live arrows/blur.
+- **One-click privacy protection** — Press `B` or right-click → **Auto-blur sensitive info** to automatically mask emails, IP addresses, phone numbers, credit cards, API tokens, and labeled passwords offline.
+- **Magnify tiny UI buttons** — Press `M` to drop a circular **2× Magnifier Loupe** so clients see both the full window context and the exact button up close.
+- **Before / After & multi-step replies** — Pick **Combine recent shots…** to stitch 2–6 captures side-by-side or vertically with `Before / After` or `Step 1, 2…` labels.
+- **Audit / SLA proof** — Toggle **Stamp** in the Frame pill to print the local timestamp (and optional ticket # or hostname) cleanly into the footer.
 
 ## Download
 
 Windows 10 or 11, 64-bit.
 
-[SnapKit 0.4.3](https://github.com/d1same/SnapKit/releases/tag/v0.4.3)
+[SnapKit 0.5.0](https://github.com/d1same/SnapKit/releases/tag/v0.5.0)
 
 Download `SnapKit-win-x64.zip` from that release. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. A non-blocking progress window stays responsive while it copies, so the install is never a silent pause. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip shows **Updating SnapKit**, closes whatever SnapKit is already running, and replaces it.
 
-This build is **0.4.3**. After it is running it periodically checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, a badge appears on the tray icon and menu, and an update window shows both versions along with the GitHub release notes. **Update now** streams the download into a versioned temp folder with live `%` and MB progress, then the new copy shows a non-blocking install window while replacing the old one and relaunches with an `--updated` toast and automatic temp cleanup. Both the tray menu and Settings also have **Check for updates…**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
+This build is **0.5.0**. After it is running it periodically checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, a badge appears on the tray icon and menu, and an update window shows both versions along with the GitHub release notes. **Update now** streams the download into a versioned temp folder with live `%` and MB progress, then the new copy shows a non-blocking install window while replacing the old one and relaunches with an `--updated` toast and automatic temp cleanup. Both the tray menu and Settings also have **Check for updates…**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -30,26 +31,18 @@ Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **R
 
 ## Use it
 
-Left-click the tray icon to capture an area. Right-click for the menu.
+Left-click the tray icon to capture an area. Right-click for the organized menu.
 
-You drag a box around a dialog, press `T`, type "Click Save", then press the crisp white **Copy** button on the floating rail. Paste it into chat, email, or a ticket. Right-click offers Copy, Quick Save, Save as…, Copy Text (OCR), Pin, Toggle Frame, Clear Marks, and Close. A file appears only if you press `Ctrl+S`, `Ctrl+Shift+S`, or Save.
+You drag a box around a dialog, press `T`, type "Click Save", then press the crisp white **Copy** button on the floating rail. Paste it into chat, email, or a ticket. Right-clicking any capture opens a cleanly grouped menu (**Share & Save**, **Smart Tools** with OCR, Auto-blur sensitive info, and Pin, and **Appearance** with Frame presets and Ticket proof stamp). A file appears only if you press `Ctrl+S`, `Ctrl+Shift+S`, or Save.
 
 ### Tray menu
 
-- Area
-- Repeat last area (re-captures the previous area dimensions/location)
-- Window
-- Full screen (the monitor under the cursor)
-- All monitors
-- Scrolling capture
-- Delayed capture (3 seconds, 5 seconds, or 10 seconds)
-- OCR (drag an area, text goes to the clipboard)
-- Record video (MP4) — zero-dependency Windows Media Foundation H.264 + WASAPI audio
-- Record GIF — zero-dependency pure-C# GIF89a animated capture
-- Recent captures (last 10, memory only)
-- Check for updates… (highlights with an indicator dot when an update is available)
-- Settings / Shortcuts
-- Exit
+Organized into three calm sections so first-time users aren't overwhelmed:
+
+- **Capture**: **Capture area**, **Capture text / table (OCR)**, and **More captures ▸** (*Window, Full screen, All monitors, Scrolling capture, Repeat last area, Delayed capture 3s / 5s / 10s*)
+- **Tutorials & Recording**: **Record video (MP4)**, **Record GIF**, and **Step-by-step guide…** (*click-by-click client SOP builder*)
+- **Tools**: **Combine recent shots…** (*Before / After or multi-step stitcher*) and **Recent captures ▸** (*last 10, memory only*)
+- **Settings & Shortcuts**, **Check for updates…**, and **Exit**
 
 ### While you are selecting
 
@@ -65,7 +58,7 @@ A selection stays on one monitor. Use **All monitors** for a combined shot.
 
 ### Editor
 
-The ultra-minimal floating rail keeps all tools on one slim row (icons with subtle shortcut letters, Undo/Redo/Clear, OCR/Pin/Save, live zoom controls in EditorWindow, and a crisp white **Copy** button on the right), with a compact detached options pill underneath showing only the contextual controls for the active tool or selection (color swatches + `#HEX`, stroke dots, shape fill toggle, or text size stepper, plus Frame toggle and live `W×H` pixel dimensions). Tool, color, stroke, text size, shape fill mode, and docs backdrop frame defaults persist automatically between captures.
+The ultra-minimal floating rail keeps all tools on one slim row (icons with subtle shortcut letters, Undo/Redo/Clear, OCR/Pin/Save, live zoom controls in EditorWindow, and a crisp white **Copy** button on the right), with a compact detached options pill underneath showing only the contextual controls for the active tool or selection (color swatches + `#HEX`, stroke dots, shape fill toggle, text size stepper, or **Auto-blur PII** when Blur/Redact is active, plus **Frame**, **Stamp**, and live `W×H` pixel dimensions). Tool, color, stroke, text size, shape fill mode, docs backdrop frame, and ticket stamp defaults persist automatically between captures.
 
 | Key | Tool / Action |
 | --- | --- |
@@ -78,9 +71,10 @@ The ultra-minimal floating rail keeps all tools on one slim row (icons with subt
 | `T` | Text |
 | `C` | Callout |
 | `N` | Numbered step (1, 2, 3, … + Reset #1) |
-| `B` | Blur (pixelate) |
-| `D` | Redact (blackout box) |
+| `B` | Blur (pixelate) + contextual **Auto-blur PII** |
+| `D` | Redact (blackout box) + contextual **Auto-redact PII** |
 | `S` | Spotlight |
+| `M` | Magnifier (2× circular zoom loupe) |
 | `X` | Crop |
 | `I` | Eyedropper (picks color & auto-copies `#HEX`) |
 | `[` `]` | Thinner / thicker stroke |
@@ -91,13 +85,13 @@ The ultra-minimal floating rail keeps all tools on one slim row (icons with subt
 | `Ctrl+Y` or `Ctrl+Shift+Z` | Redo |
 | `Delete` / `Backspace` | Remove the selected mark |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` / `Ctrl+1` | Zoom in / out / fit / 100% (Editor window) |
-| Right-click | Copy, Quick Save, Save as…, Copy Text (OCR), Pin, Toggle Frame, Clear Marks, Close |
+| Right-click | Organized Share & Save, Smart Tools (OCR, Auto-blur PII, Pin), and Appearance (Frame, Ticket Stamp) menu |
 | `Ctrl+C` | Copy the picture and close the shot |
 | `Ctrl+Shift+S` | Quick save PNG directly to your Quick Save folder and close |
 | `Ctrl+S` | Save as PNG or JPG, then close the shot |
 | `Esc` | Discard the edits and close |
 
-Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` while typing cancels that edit. Drag the circular handles on any selected arrow, callout, box, circle, blur, redact, or spotlight to resize or re-aim endpoints directly. Choose **Clean**, **Dark**, or **Slate** under **Frame** to wrap the export in a rounded documentation backdrop with a soft drop shadow.
+Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` while typing cancels that edit. Drag the circular handles on any selected arrow, callout, box, circle, blur, redact, spotlight, or magnifier loupe to resize or re-aim endpoints directly. Choose **Clean**, **Dark**, or **Slate** under **Frame** to wrap the export in a rounded documentation backdrop with a soft drop shadow, and toggle **Stamp** to add a subtle timestamp and optional ticket # or hostname proof bar.
 
 **Pin** floats the picture always-on-top with a hover action bar (**Copy**, **Save**, opacity badge, close). Drag to move, scroll wheel to resize, `Ctrl`+scroll wheel to adjust opacity (`20%–100%`), double-click or `Ctrl+C` to copy (with a green `"Copied!"` toast), `Ctrl+Shift+S` to quick save, `Ctrl+S` to save as, `Ctrl+0` to reset, right-click for the context menu, and `Esc` to close.
 
@@ -105,7 +99,7 @@ OCR reads the capture on the PC, then highlights each word on the picture. The h
 
 ### Recording (MP4 & GIF)
 
-Choose **Record video (MP4)** (`Ctrl+Alt+V`) or **Record GIF** (`Ctrl+Alt+G`), drag an area or click a window (`Space` switches mode), then use the floating HUD to toggle **MP4 / GIF**, **Cursor** (pointer + click highlight rings), and **Audio** (system playback via WASAPI loopback) / **Mic** for MP4. Click **Record** (or press `Enter`) to start, **Pause / Resume** anytime, and **Stop** (or press the record hotkey again) to finish. Both the dashed frame and floating HUD are excluded from the captured recording.
+Choose **Record video (MP4)** (`Ctrl+Alt+V`) or **Record GIF** (`Ctrl+Alt+G`), drag an area or click a window (`Space` switches mode), then use the floating HUD to toggle **MP4 / GIF**, **Cursor** (pointer + click highlight rings), **Audio** (system playback via WASAPI loopback) / **Mic** (with a live mic activity dot while recording), and **3-2-1** countdown. Click **Record** (or press `Enter`) to start, **Pause / Resume** anytime, and **Stop** (or press the record hotkey again) to finish. Both the dashed frame, countdown badge, and floating HUD are excluded from the captured recording.
 
 While recording, click **Draw** on the floating HUD to sketch live **arrows, pen marks, rectangles, circles, step badges, Live Blur (real-time mosaic pixelation), or Live Redact (blackout)** right over the capture region — with optional **Auto-fade** for temporary pointers. Live Blur pixelates pixels directly in the recording pipeline so secrets never touch the exported file.
 
