@@ -4,32 +4,10 @@ SnapKit is a small, zero-dependency Windows screenshot and tutorial-recording to
 
 Nothing is saved to disk unless you ask. Captures stay in memory.
 
-![SnapKit floating editor showing numbered steps, callout, pixelate blur, Docs Backdrop Frame, and the Style 3 ultra-minimal rail](docs/media/hero-editor.png)
-
-## See what you can make
-
-### Tutorial Videos & Animated GIFs — Live Draw, Live Blur & Timeline Editor
-
-Record an area or window straight to **MP4 (H.264 + system audio/mic)** or **GIF** with zero FFmpeg install. Toggle **Draw** or **Blur** mid-recording to sketch arrows and pixelate API keys live before they ever hit the file, then polish timing in the built-in **Post-Recording Tutorial Editor** with trim handles and timed arrows, callouts, steps, blur, redact, and spotlight clips.
-
-![Animated tutorial recording demo showing click rings, live red arrow, Step 1 badge, real-time Live Blur over an API token, and the post-recording timeline editor](docs/media/tutorial-recording.gif)
-
-### Blur Secrets, Redact PII & Spotlight What Matters
-
-Share real production dashboards without leaking credentials. Use **Pixelate Blur (`B`)** (`Soft / Med / Strong`) to mask API keys and tokens in both screenshots and live video, **Solid Redact (`D`)** for irreversible blackout over customer emails and billing info, and **Spotlight (`S`)** to dim everything outside the panel you want readers to notice.
-
-![Privacy and focus showcase demonstrating Pixelate Blur over API keys, Solid Redact blackout over billing info, and Spotlight dimming around Rate Limits](docs/media/blur-redact-spotlight.png)
-
-### Offline OCR, Always-On-Top Pinning & Long Scrolling Captures
-
-Copy unselectable text from error dialogs or terminals using Windows' built-in local OCR (no cloud), **Pin** any capture always-on-top with scroll-to-resize and `Ctrl+Scroll` opacity as a floating reference over your IDE, or stitch tall docs and chats up to **20,000 px** with **Scrolling Capture** (fixed header kept once, scrollbar auto-ignored).
-
-![Three-panel showcase of On-Device OCR word selection, Pin Always-On-Top floating reference with hover bar, and Auto-Stitched Scrolling Capture](docs/media/ocr-pin-scroll.png)
-
 ### Everyday ideas
 
-- **PR & changelog walkthroughs** — Record a 5-second **GIF** (`Ctrl+Alt+G`) with amber click rings and a live red arrow, press `Ctrl+C`, and paste the `.gif` directly into GitHub, Slack, or Discord.
-- **Safe bug reports** — Pixelate `.env` secrets or redact customer emails with `B` / `D` in one drag before pasting into a ticket.
+- **PR & changelog walkthroughs** — Record a 5-second **GIF** (`Ctrl+Alt+G`) with click highlight rings and a live arrow, press `Ctrl+C`, and paste the `.gif` directly into GitHub, Slack, or Discord.
+- **Safe bug reports** — Pixelate `.env` secrets or redact customer emails with `B` / `D` in one drag before pasting into a ticket, or turn on **Live Blur** while recording video.
 - **Instant docs graphics** — Drop `1` `2` `3` step badges (`N`), add a callout (`C`), flip **Frame** to **Slate** or **Clean**, and copy a presentation-ready image with a soft drop shadow.
 - **Copy text from locked dialogs or videos** — Press `Ctrl+Shift+O`, drag across any error log or screenshot, and grab clean text offline.
 - **Floating cheat sheets** — **Pin** a design palette, SQL schema, or terminal reference at 85% opacity while you work.
