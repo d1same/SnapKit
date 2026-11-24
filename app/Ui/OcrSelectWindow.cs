@@ -8,7 +8,8 @@ namespace SnapKit;
 
 /// <summary>
 /// Snipping Tool style: recognized words are highlighted on the capture.
-/// Drag across the ones you want and that text is copied.
+/// Drag across the ones you want and that text is copied — either as plain text
+/// or as a tab-separated table ready to paste directly into Excel / Google Sheets.
 /// </summary>
 internal sealed class OcrSelectWindow : Window
 {
@@ -17,15 +18,27 @@ internal sealed class OcrSelectWindow : Window
     private static readonly SolidColorBrush On = Palette.Freeze(242, 242, 242, 0x72);
     private static readonly SolidColorBrush BoxEdge = Palette.Freeze(21, 21, 21, 0x88);
     private static readonly SolidColorBrush BoxEdgeOn = Palette.Freeze(242, 242, 242, 0xE6);
+    private static readonly SolidColorBrush GuideLight = Palette.Freeze(242, 242, 242, 0x8C);
+    private static readonly SolidColorBrush GuideDark = Palette.Freeze(21, 21, 21, 0x99);
 
     private readonly PixelBuffer _image;
     private readonly OcrPage _page;
+    private readonly OcrTableResult _fullTable;
     private readonly Image _picture;
     private readonly Canvas _marks;
+    private readonly Canvas _guides;
     private readonly TextBlock _status;
+    private readonly Border _textModeBtn;
+    private readonly Border _tableModeBtn;
+    private readonly TextBlock _textModeLabel;
+    private readonly TextBlock _tableModeLabel;
+    private readonly UIElement _textModeIcon;
+    private readonly UIElement _tableModeIcon;
+    private readonly Button? _copyAllBtn;
     private readonly List<Border> _boxes = new();
     private readonly HashSet<int> _selected = new();
     private Rectangle? _band;
+    private bool _tableMode;
     private bool _dragging;
     private bool _moved;
     private Point _start;
@@ -37,6 +50,9 @@ internal sealed class OcrSelectWindow : Window
     {
         _image = image;
         _page = page;
+        _fullTable = page.TableAll();
+        _tableMode = _fullTable.IsLikelyTable;
+
         Title = Brand.Name + " OCR";
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -56,6 +72,14 @@ internal sealed class OcrSelectWindow : Window
             VerticalAlignment = VerticalAlignment.Top
         };
         RenderOptions.SetBitmapScalingMode(_picture, BitmapScalingMode.NearestNeighbor);
+        _guides = new Canvas
+        {
+            Background = Brushes.Transparent,
+            IsHitTestVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            SnapsToDevicePixels = true
+        };
         _marks = new Canvas
         {
             Background = Brushes.Transparent,
@@ -65,9 +89,9 @@ internal sealed class OcrSelectWindow : Window
         };
         var stage = new Grid
         {
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
-            Children = { _picture, _marks }
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children = { _picture, _guides, _marks }
         };
         stage.MouseLeftButtonDown += OnDown;
         stage.MouseMove += OnMove;
@@ -75,21 +99,45 @@ internal sealed class OcrSelectWindow : Window
         _marks.SizeChanged += (_, _) => BuildMarks();
         _marks.LostMouseCapture += (_, _) => EndDrag();
 
+        // Style 3 segmented mode toggle: Text | Table (Excel)
+        (_textModeBtn, _textModeIcon, _textModeLabel) = ModeChip(
+            LucideIcon.AlignLeft,
+            "Text",
+            "Copy as plain reading-order text  (Tab to toggle)",
+            () => SetTableMode(false, recopyIfSelected: true));
+        (_tableModeBtn, _tableModeIcon, _tableModeLabel) = ModeChip(
+            LucideIcon.Table,
+            "Table",
+            "Copy as Excel / Google Sheets table (TSV)  (Tab to toggle)",
+            () => SetTableMode(true, recopyIfSelected: true));
+        _textModeBtn.Margin = new Thickness(0, 0, 2, 0);
+
+        var modeSwitch = new Border
+        {
+            Background = Palette.Group,
+            BorderBrush = Palette.Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(2),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Children = { _textModeBtn, _tableModeBtn }
+            }
+        };
+
         _status = new TextBlock
         {
-            Text = page.Words.Count == 0
-                ? "No text found in that area."
-                : $"{page.Words.Count} {(page.Words.Count == 1 ? "word" : "words")} found  ·  Drag across words to copy  ·  Ctrl+A copies all  ·  Esc closes",
             Foreground = Palette.Muted,
             FontFamily = Palette.Font,
             FontSize = 12.5,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(14, 0, 14, 0)
+            Margin = new Thickness(12, 0, 12, 0)
         };
-        var copyAll = UiChrome.ActionButton("Copy all", CopyAll, ButtonTone.Primary, minWidth: 96);
-        copyAll.Margin = new Thickness(0, 0, 8, 0);
-        var close = UiChrome.ActionButton("Close", Close, ButtonTone.Secondary, minWidth: 78);
+
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -98,15 +146,28 @@ internal sealed class OcrSelectWindow : Window
             Margin = new Thickness(0, 0, 12, 0)
         };
         if (!string.IsNullOrWhiteSpace(page.Text) || page.Words.Count > 0)
-            buttons.Children.Add(copyAll);
+        {
+            _copyAllBtn = UiChrome.ActionButton("Copy all", CopyAll, ButtonTone.Primary, minWidth: 102);
+            _copyAllBtn.Margin = new Thickness(0, 0, 8, 0);
+            buttons.Children.Add(_copyAllBtn);
+        }
+        var close = UiChrome.ActionButton("Close", Close, ButtonTone.Secondary, minWidth: 74);
         buttons.Children.Add(close);
+
         var barGrid = new Grid();
+        barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(_status, 0);
-        Grid.SetColumn(buttons, 1);
+        if (page.Words.Count > 0)
+        {
+            Grid.SetColumn(modeSwitch, 0);
+            barGrid.Children.Add(modeSwitch);
+        }
+        Grid.SetColumn(_status, 1);
+        Grid.SetColumn(buttons, 2);
         barGrid.Children.Add(_status);
         barGrid.Children.Add(buttons);
+
         var bar = new Border
         {
             Height = 52,
@@ -122,8 +183,99 @@ internal sealed class OcrSelectWindow : Window
             Children = { At(bar, Dock.Bottom), stage }
         };
 
+        UpdateModeChrome();
+        ResetStatusHint();
+
         PreviewKeyDown += OnKey;
         SourceInitialized += (_, _) => PlaceOnMonitor();
+    }
+
+    private static (Border chip, UIElement icon, TextBlock label) ModeChip(LucideIcon kind, string text, string tip, Action onClick)
+    {
+        var icon = LucideIcons.Create(kind, Palette.Muted, size: 13.5, strokeWidth: 1.9);
+        var label = new TextBlock
+        {
+            Text = text,
+            Foreground = Palette.Muted,
+            FontFamily = Palette.Font,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(5, 0, 0, 0)
+        };
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children = { icon, label }
+        };
+        var chip = new Border
+        {
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(9, 4, 10, 4),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tip,
+            Child = row
+        };
+        chip.MouseLeftButtonDown += (_, e) =>
+        {
+            onClick();
+            e.Handled = true;
+        };
+        return (chip, icon, label);
+    }
+
+    private void SetTableMode(bool enabled, bool recopyIfSelected)
+    {
+        if (_tableMode == enabled)
+            return;
+        _tableMode = enabled;
+        UpdateModeChrome();
+        BuildGuides();
+
+        if (recopyIfSelected && _selected.Count > 0)
+            CopyCurrentSelection();
+        else
+            ResetStatusHint();
+    }
+
+    private void UpdateModeChrome()
+    {
+        ApplyModeChip(_textModeBtn, _textModeIcon, _textModeLabel, active: !_tableMode);
+        ApplyModeChip(_tableModeBtn, _tableModeIcon, _tableModeLabel, active: _tableMode);
+        if (_copyAllBtn != null)
+            _copyAllBtn.Content = _tableMode ? "Copy table" : "Copy all";
+    }
+
+    private static void ApplyModeChip(Border chip, UIElement icon, TextBlock label, bool active)
+    {
+        chip.Background = active ? Palette.ActiveSurface : Brushes.Transparent;
+        var ink = active ? Palette.Ink : Palette.Muted;
+        label.Foreground = ink;
+        LucideIcons.Recolor(icon, ink);
+    }
+
+    private void ResetStatusHint()
+    {
+        _status.Foreground = Palette.Muted;
+        if (_page.Words.Count == 0)
+        {
+            _status.Text = "No text found in that area.";
+            return;
+        }
+
+        if (_tableMode)
+        {
+            string dims = _fullTable.ColumnCount >= 2
+                ? $"Table ({_fullTable.ColumnCount} cols × {_fullTable.RowCount} rows)"
+                : "Table mode";
+            _status.Text = $"{dims}  ·  Drag to copy for Excel  ·  Ctrl+A copies all  ·  Tab switches mode";
+        }
+        else
+        {
+            _status.Text = $"{_page.Words.Count} {(_page.Words.Count == 1 ? "word" : "words")} found  ·  Drag to copy  ·  Tab for Excel table  ·  Esc closes";
+        }
     }
 
     private void PlaceOnMonitor()
@@ -142,11 +294,16 @@ internal sealed class OcrSelectWindow : Window
         double dipH = viewH / scale;
         _picture.Width = dipW;
         _picture.Height = dipH;
+        _guides.Width = dipW;
+        _guides.Height = dipH;
         _marks.Width = dipW;
         _marks.Height = dipH;
-        int x = monitor.X + Math.Max(0, (monitor.Width - viewW) / 2);
+
+        int minBarW = Math.Min(maxW, (int)Math.Ceiling(560 * scale));
+        int winW = Math.Max(viewW, minBarW);
+        int x = monitor.X + Math.Max(0, (monitor.Width - winW) / 2);
         int y = monitor.Y + Math.Max(0, (monitor.Height - viewH - bar) / 2);
-        WindowChrome.Place(this, x, y, viewW, viewH + bar, scale, topmost: true, activate: true, inTaskbar: true);
+        WindowChrome.Place(this, x, y, winW, viewH + bar, scale, topmost: true, activate: true, inTaskbar: true);
         BuildMarks();
     }
 
@@ -177,7 +334,69 @@ internal sealed class OcrSelectWindow : Window
             _marks.Children.Add(box);
             _boxes.Add(box);
         }
+        BuildGuides();
         Paint();
+    }
+
+    private void BuildGuides()
+    {
+        _guides.Children.Clear();
+        if (!_tableMode || double.IsNaN(_guides.Width) || _guides.Width < 1 || _guides.Height < 1 || _image.Width < 1)
+            return;
+
+        var table = _selected.Count >= 2 ? _page.TableFor(_selected) : _fullTable;
+        if (table.ColumnSplits.Count == 0)
+            return;
+
+        double y0 = 0;
+        double y1 = _guides.Height;
+        if (_selected.Count >= 2)
+        {
+            double minY = double.MaxValue;
+            double maxY = double.MinValue;
+            foreach (int i in _selected)
+            {
+                if (i < 0 || i >= _page.Words.Count) continue;
+                var w = _page.Words[i];
+                if (w.Y < minY) minY = w.Y;
+                if (w.Bottom > maxY) maxY = w.Bottom;
+            }
+            if (minY < maxY)
+            {
+                var span = OcrMap.ToView(new OcrBox(0, minY, 1, maxY - minY), _image.Width, _image.Height, _guides.Width, _guides.Height, 0, 0);
+                y0 = Math.Max(0, span.Y - 4);
+                y1 = Math.Min(_guides.Height, span.Y + span.Height + 4);
+            }
+        }
+
+        foreach (double splitX in table.ColumnSplits)
+        {
+            var mapped = OcrMap.ToView(new OcrBox(splitX, 0, 1, 1), _image.Width, _image.Height, _guides.Width, _guides.Height, 0, 0);
+            double x = Math.Round(mapped.X);
+            // High-contrast paired hairline (dark shadow + dashed light) stays legible on both light & dark tables.
+            _guides.Children.Add(new Line
+            {
+                X1 = x + 1,
+                Y1 = y0,
+                X2 = x + 1,
+                Y2 = y1,
+                Stroke = GuideDark,
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 4, 3 },
+                IsHitTestVisible = false
+            });
+            _guides.Children.Add(new Line
+            {
+                X1 = x,
+                Y1 = y0,
+                X2 = x,
+                Y2 = y1,
+                Stroke = GuideLight,
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 4, 3 },
+                IsHitTestVisible = false
+            });
+        }
     }
 
     private void OnKey(object sender, KeyEventArgs e)
@@ -188,13 +407,31 @@ internal sealed class OcrSelectWindow : Window
             e.Handled = true;
             return;
         }
+        if (e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            SetTableMode(!_tableMode, recopyIfSelected: true);
+            e.Handled = true;
+            return;
+        }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.A)
         {
             _selected.Clear();
             for (int i = 0; i < _page.Words.Count; i++)
                 _selected.Add(i);
+            BuildGuides();
             Paint();
-            CopySelection(_page.Text);
+            CopyAll();
+            e.Handled = true;
+            return;
+        }
+        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.C)
+        {
+            if (!_tableMode)
+                SetTableMode(true, recopyIfSelected: false);
+            if (_selected.Count == 0)
+                CopyAll();
+            else
+                CopyCurrentSelection();
             e.Handled = true;
             return;
         }
@@ -203,7 +440,7 @@ internal sealed class OcrSelectWindow : Window
             if (_selected.Count == 0)
                 CopyAll();
             else
-                CopySelection(_page.TextFor(_selected));
+                CopyCurrentSelection();
             e.Handled = true;
         }
     }
@@ -251,11 +488,15 @@ internal sealed class OcrSelectWindow : Window
             if (hit >= 0)
                 _selected.Add(hit);
         }
+        BuildGuides();
         Paint();
         if (_selected.Count > 0)
-            CopySelection(_page.TextFor(_selected));
+            CopyCurrentSelection();
         else
+        {
+            _status.Foreground = Palette.Muted;
             _status.Text = "Nothing under that drag. Try the highlighted words.";
+        }
     }
 
     private void EndDrag()
@@ -264,9 +505,10 @@ internal sealed class OcrSelectWindow : Window
             return;
         _dragging = false;
         HideBand();
+        BuildGuides();
         Paint();
         if (_selected.Count > 0)
-            CopySelection(_page.TextFor(_selected));
+            CopyCurrentSelection();
     }
 
     private void SelectRect(Point a, Point b)
@@ -345,7 +587,24 @@ internal sealed class OcrSelectWindow : Window
             _marks.Children.Remove(_band);
     }
 
-    private void CopySelection(string text)
+    private void CopyCurrentSelection()
+    {
+        if (_tableMode)
+        {
+            var table = _page.TableFor(_selected);
+            CopySelection(
+                table.ToTsv(),
+                table.ColumnCount > 1 || table.RowCount > 1
+                    ? $"Copied table ({table.ColumnCount} cols × {table.RowCount} rows) — paste into Excel!"
+                    : "Copied! Paste it anywhere.");
+        }
+        else
+        {
+            CopySelection(_page.TextFor(_selected), "Copied! Paste it anywhere.");
+        }
+    }
+
+    private void CopySelection(string text, string successMessage = "Copied! Paste it anywhere.")
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -357,19 +616,29 @@ internal sealed class OcrSelectWindow : Window
         {
             Clipboard.SetText(text);
             _status.Foreground = Palette.Copied;
-            _status.Text = "Copied! Paste it anywhere.";
+            _status.Text = successMessage;
         }
         catch
         {
             _status.Foreground = Palette.Warning;
-            _status.Text = "The clipboard is busy. Try Copy all again.";
+            _status.Text = "The clipboard is busy. Try Copy again.";
         }
     }
 
     private void CopyAll()
     {
+        if (_tableMode)
+        {
+            CopySelection(
+                _fullTable.ToTsv(),
+                _fullTable.ColumnCount > 1 || _fullTable.RowCount > 1
+                    ? $"Copied table ({_fullTable.ColumnCount} cols × {_fullTable.RowCount} rows) — paste into Excel!"
+                    : "Copied! Paste it anywhere.");
+            return;
+        }
+
         string text = string.IsNullOrWhiteSpace(_page.Text) ? _page.TextFor(Enumerable.Range(0, _page.Words.Count)) : _page.Text;
-        CopySelection(text);
+        CopySelection(text, "Copied! Paste it anywhere.");
     }
 
     private static UIElement At(UIElement element, Dock dock)

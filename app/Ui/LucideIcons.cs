@@ -43,7 +43,9 @@ internal enum LucideIcon
     Minus,
     Plus,
     Sparkles,
-    Check
+    Check,
+    Table,
+    AlignLeft
 }
 
 /// <summary>
@@ -374,6 +376,21 @@ internal static class LucideIcons
             // Lucide: check
             case LucideIcon.Check:
                 Path("M 20 6 L 9 17 L 4 12");
+                break;
+
+            // Lucide: table
+            case LucideIcon.Table:
+                Rect(3, 3, 18, 18, rx: 2);
+                Line(3, 9, 21, 9);
+                Line(3, 15, 21, 15);
+                Line(9, 3, 9, 21);
+                break;
+
+            // Lucide: align-left
+            case LucideIcon.AlignLeft:
+                Line(4, 6, 20, 6);
+                Line(4, 12, 14, 12);
+                Line(4, 18, 18, 18);
                 break;
         }
 

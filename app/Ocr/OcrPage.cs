@@ -26,6 +26,7 @@ internal sealed class OcrToken
     }
 
     public OcrPiece Piece => new(Line, Text, LineText, WordsInLine, X, Y);
+    public OcrWordBox WordBox => new(Text, X, Y, Width, Height);
 }
 
 internal sealed class OcrPage
@@ -42,5 +43,23 @@ internal sealed class OcrPage
             .Select(index => Words[index].Piece)
             .ToList();
         return OcrText.Join(pieces);
+    }
+
+    public OcrTableResult TableFor(IEnumerable<int> indexes)
+    {
+        var boxes = indexes
+            .Where(index => index >= 0 && index < Words.Count)
+            .Distinct()
+            .Select(index => Words[index].WordBox)
+            .ToList();
+        return OcrTable.Build(boxes);
+    }
+
+    public OcrTableResult TableAll()
+    {
+        var boxes = new OcrWordBox[Words.Count];
+        for (int i = 0; i < Words.Count; i++)
+            boxes[i] = Words[i].WordBox;
+        return OcrTable.Build(boxes);
     }
 }
