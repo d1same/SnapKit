@@ -1,8 +1,38 @@
 # SnapKit
 
-SnapKit is a small Windows screenshot tool for people who write docs. It sits in the system tray, grabs a region, and lets you mark it up before you copy it.
+SnapKit is a small, zero-dependency Windows screenshot and tutorial-recording tool for people who write docs, ship code, and share bug reports. It sits in the system tray, grabs a region, and lets you mark it up — or record an annotated MP4/GIF — before you copy it straight to the clipboard.
 
 Nothing is saved to disk unless you ask. Captures stay in memory.
+
+![SnapKit floating editor showing numbered steps, callout, pixelate blur, Docs Backdrop Frame, and the Style 3 ultra-minimal rail](docs/media/hero-editor.png)
+
+## See what you can make
+
+### Tutorial Videos & Animated GIFs — Live Draw, Live Blur & Timeline Editor
+
+Record an area or window straight to **MP4 (H.264 + system audio/mic)** or **GIF** with zero FFmpeg install. Toggle **Draw** or **Blur** mid-recording to sketch arrows and pixelate API keys live before they ever hit the file, then polish timing in the built-in **Post-Recording Tutorial Editor** with trim handles and timed arrows, callouts, steps, blur, redact, and spotlight clips.
+
+![Animated tutorial recording demo showing click rings, live red arrow, Step 1 badge, real-time Live Blur over an API token, and the post-recording timeline editor](docs/media/tutorial-recording.gif)
+
+### Blur Secrets, Redact PII & Spotlight What Matters
+
+Share real production dashboards without leaking credentials. Use **Pixelate Blur (`B`)** (`Soft / Med / Strong`) to mask API keys and tokens in both screenshots and live video, **Solid Redact (`D`)** for irreversible blackout over customer emails and billing info, and **Spotlight (`S`)** to dim everything outside the panel you want readers to notice.
+
+![Privacy and focus showcase demonstrating Pixelate Blur over API keys, Solid Redact blackout over billing info, and Spotlight dimming around Rate Limits](docs/media/blur-redact-spotlight.png)
+
+### Offline OCR, Always-On-Top Pinning & Long Scrolling Captures
+
+Copy unselectable text from error dialogs or terminals using Windows' built-in local OCR (no cloud), **Pin** any capture always-on-top with scroll-to-resize and `Ctrl+Scroll` opacity as a floating reference over your IDE, or stitch tall docs and chats up to **20,000 px** with **Scrolling Capture** (fixed header kept once, scrollbar auto-ignored).
+
+![Three-panel showcase of On-Device OCR word selection, Pin Always-On-Top floating reference with hover bar, and Auto-Stitched Scrolling Capture](docs/media/ocr-pin-scroll.png)
+
+### Everyday ideas
+
+- **PR & changelog walkthroughs** — Record a 5-second **GIF** (`Ctrl+Alt+G`) with amber click rings and a live red arrow, press `Ctrl+C`, and paste the `.gif` directly into GitHub, Slack, or Discord.
+- **Safe bug reports** — Pixelate `.env` secrets or redact customer emails with `B` / `D` in one drag before pasting into a ticket.
+- **Instant docs graphics** — Drop `1` `2` `3` step badges (`N`), add a callout (`C`), flip **Frame** to **Slate** or **Clean**, and copy a presentation-ready image with a soft drop shadow.
+- **Copy text from locked dialogs or videos** — Press `Ctrl+Shift+O`, drag across any error log or screenshot, and grab clean text offline.
+- **Floating cheat sheets** — **Pin** a design palette, SQL schema, or terminal reference at 85% opacity while you work.
 
 ## Download
 
@@ -99,7 +129,9 @@ OCR reads the capture on the PC, then highlights each word on the picture. The h
 
 Choose **Record video (MP4)** (`Ctrl+Alt+V`) or **Record GIF** (`Ctrl+Alt+G`), drag an area or click a window (`Space` switches mode), then use the floating HUD to toggle **MP4 / GIF**, **Cursor** (pointer + click highlight rings), and **Audio** (system playback via WASAPI loopback) / **Mic** for MP4. Click **Record** (or press `Enter`) to start, **Pause / Resume** anytime, and **Stop** (or press the record hotkey again) to finish. Both the dashed frame and floating HUD are excluded from the captured recording.
 
-When finished, **Copy file** (`Ctrl+C`) copies the `.mp4` or `.gif` file directly to the clipboard so `Ctrl+V` pastes it straight into Slack, Teams, Discord, GitHub, or Explorer; **Quick Save** (`Ctrl+Shift+S`) saves immediately to your Quick Save folder; **Save as…** (`Ctrl+S`) opens Explorer; and **Play** previews it. Zero external installs or FFmpeg required.
+While recording, click **Draw** on the floating HUD to sketch live **arrows, pen marks, rectangles, circles, step badges, Live Blur (real-time mosaic pixelation), or Live Redact (blackout)** right over the capture region — with optional **Auto-fade** for temporary pointers. Live Blur pixelates pixels directly in the recording pipeline so secrets never touch the exported file.
+
+When finished, click **Annotate / Edit** to open the **Post-Recording Tutorial Video Editor** (timeline scrubbing, trim handles, and timed arrows, callouts, step badges, Soft/Med/Strong pixelate blur, blackout redact, and spotlight overlays), or use **Copy file** (`Ctrl+C`) to copy the `.mp4` or `.gif` directly to the clipboard so `Ctrl+V` pastes straight into Slack, Teams, Discord, GitHub, or Explorer; **Quick Save** (`Ctrl+Shift+S`); **Save as…** (`Ctrl+S`); or **Play**. Zero external installs or FFmpeg required.
 
 ### Global shortcuts
 
@@ -117,7 +149,7 @@ These are the defaults. Change them in Settings. They are stored in `%APPDATA%\S
 | `Ctrl+Alt+G` | Record GIF |
 | `Ctrl+Alt+Shift+Esc` | Quit SnapKit immediately |
 
-Windows 11 often gives `PrtSc` to the Snipping Tool. Turn that off in Windows Settings, then set SnapKit's keys again if a shortcut fails to register.
+On Windows 11, SnapKit automatically intercepts `PrtSc` via a low-level keyboard hook so the built-in Snipping Tool does not steal it. Settings also includes a one-click toggle to turn off Windows' **Use the Print screen key to open screen capture** setting permanently.
 
 Settings also configures **Start with Windows** (on), **Close shot on click-away** (on), **Capture flash** (on), **Shutter sound** (off), recording defaults (cursor & click rings, system audio, microphone), your **Quick Save** folder (default `Pictures\SnapKit`), and **Check for updates**. The tray tooltip shows the version (and update status). On Windows 11 the tray icon is placed next to the clock. If it still lands in the overflow, open Settings → Personalization → Taskbar → Other system tray icons and turn SnapKit on.
 
@@ -148,7 +180,7 @@ dotnet test tests/SnapKit.Core.Tests/SnapKit.Core.Tests.csproj -c Release
 - Recent captures keep the last 10 shots in memory. They are gone when SnapKit exits.
 - Closing, copying, saving, or pinning bakes the marks into the recent item. Reopening it is a flat image.
 - `Esc` in the editor throws away the marks. The original crop stays in Recent.
-- Scrolling capture focuses the page, moves the mouse onto it, hides its own status while the wheel is sent, waits for the scroll animation to finish, then stitches by overlap. A maximized window stays maximized. It stops at the end of the page, on `Esc`, or at 16,000 pixels. A window that does not scroll with the wheel, a page that keeps animating, or a list that recycles rows instead of moving pixels can stop the stitch early.
+- Scrolling capture focuses the page, moves the mouse onto it, excludes its floating status HUD from capture, waits for the scroll animation to settle, then stitches by contrast-weighted overlap. A maximized window stays maximized. It stops at the end of the page, on `Esc`, or at 20,000 pixels. A window that does not scroll with the wheel, a page that keeps animating, or a list that recycles rows instead of moving pixels can stop the stitch early.
 - The scrollbar column is ignored. A fixed header and footer are kept from the first frame.
 - Cross-monitor drag is not supported.
 - After you finish a selection, that screen stays dimmed with the shot sitting on the spot you captured. Drag a corner to resize it or the edge to move it. One dashed line stays on the edge until you copy, save, press `Esc`, or click outside. The toolbar next to the shot names each tool, and a large Copy button copies the picture and closes the shot. `Esc` closes both.
