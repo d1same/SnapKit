@@ -136,4 +136,24 @@ public class MspFeaturesTests
         var mag = new Annotation { Kind = AnnotationKind.Magnifier, Points = new() { new(20, 20), new(100, 100) } };
         Assert.Equal(4, AnnotationHandles.For(mag).Count);
     }
+
+    [Fact]
+    public void PrintLayout_fits_standard_shot_on_one_page_and_paginates_tall_guides()
+    {
+        // Standard 16:9 capture on US Letter portrait (816x1056 DIPs at 96 DPI) -> 1 centered page
+        var single = PrintLayout.Paginate(1920, 1080, printableWidth: 816, printableHeight: 1056, margin: 36);
+        Assert.Single(single);
+        Assert.Equal(0, single[0].SourceY);
+        Assert.Equal(1080, single[0].SourceHeight);
+        Assert.True(single[0].DestWidth <= 816 - 72 + 0.01);
+        Assert.True(single[0].DestHeight <= 1056 - 72 + 0.01);
+
+        // Tall 860x3200 multi-step client guide -> slices cleanly across multiple pages with full pixel coverage
+        var multi = PrintLayout.Paginate(860, 3200, printableWidth: 816, printableHeight: 1056, margin: 36);
+        Assert.True(multi.Count >= 3);
+        Assert.Equal(0, multi[0].SourceY);
+        Assert.Equal(3200, multi.Sum(p => p.SourceHeight));
+        for (int i = 1; i < multi.Count; i++)
+            Assert.Equal(multi[i - 1].SourceY + multi[i - 1].SourceHeight, multi[i].SourceY);
+    }
 }

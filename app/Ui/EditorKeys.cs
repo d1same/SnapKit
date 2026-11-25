@@ -47,6 +47,14 @@ internal static class EditorKeys
             e.Handled = true;
             return true;
         }
+        if (ctrl && e.Key == Key.P)
+        {
+            surface.CommitEditing();
+            var owner = surface.IsVisible ? WindowOf(surface) : System.Windows.Application.Current.MainWindow!;
+            owner.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() => session.Print(owner)));
+            e.Handled = true;
+            return true;
+        }
         if (ctrl && e.Key == Key.D)
         {
             if (surface.DuplicateSelection())

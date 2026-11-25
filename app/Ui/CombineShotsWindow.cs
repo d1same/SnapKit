@@ -138,12 +138,15 @@ internal sealed class CombineShotsWindow : Window
         var editBtn = UiChrome.ActionButton("Open in Editor", OpenInEditor, ButtonTone.Secondary, minWidth: 112);
         editBtn.Margin = new Thickness(0, 0, 6, 0);
         var saveBtn = UiChrome.ActionButton("Save PNG…", SavePng, ButtonTone.Secondary, minWidth: 86);
+        saveBtn.Margin = new Thickness(0, 0, 6, 0);
+        var printBtn = UiChrome.ActionButton("Print…", PrintCombined, ButtonTone.Secondary, minWidth: 72);
+        printBtn.ToolTip = "Print combined image  (Ctrl+P)";
 
         var actionRow = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
-            Children = { copyBtn, editBtn, saveBtn }
+            Children = { copyBtn, editBtn, saveBtn, printBtn }
         };
 
         var barGrid = new Grid();
@@ -193,6 +196,11 @@ internal sealed class CombineShotsWindow : Window
             else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
             {
                 CopyCombined();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.P && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                PrintCombined();
                 e.Handled = true;
             }
         };
@@ -485,6 +493,25 @@ internal sealed class CombineShotsWindow : Window
         {
             _status.Foreground = Palette.Copied;
             _status.Text = "Saved combined PNG!";
+        }
+    }
+
+    private void PrintCombined()
+    {
+        if (_selected.Count < 2)
+            return;
+        try
+        {
+            if (ImageFile.Print(RenderCombined(), this, $"{Brand.Name} Combined Shots"))
+            {
+                _status.Foreground = Palette.Copied;
+                _status.Text = "Sent combined shots to printer!";
+            }
+        }
+        catch (Exception ex)
+        {
+            _status.Foreground = Palette.Warning;
+            _status.Text = "Print failed: " + ex.Message;
         }
     }
 }

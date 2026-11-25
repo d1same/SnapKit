@@ -1,6 +1,9 @@
 using System.IO;
+using System.Printing;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -216,6 +219,93 @@ internal static class ImageFile
                     try { owner.Activate(); } catch { /* closed */ }
                 }, DispatcherPriority.Input);
             }
+        }
+    }
+
+    public static bool Print(BitmapSource image, Window owner, string? jobTitle = null)
+    {
+        try { System.Windows.Input.Mouse.Capture(null); } catch { /* ignore */ }
+        using var pauseClickAway = ClickAway.Pause(owner);
+        using var suspendTopmost = WindowChrome.SuspendTopmost(owner);
+        try
+        {
+            var dialog = new PrintDialog();
+            // Suggest landscape automatically for wide captures (user can still override in dialog).
+            if (image.PixelWidth > image.PixelHeight * 1.15)
+            {
+                try
+                {
+                    if (dialog.PrintTicket != null)
+                        dialog.PrintTicket.PageOrientation = PageOrientation.Landscape;
+                }
+                catch
+                {
+                    // Some virtual/network printers disallow modifying PrintTicket before selection.
+                }
+            }
+
+            if (dialog.ShowDialog() != true)
+                return false;
+
+            double pageW = Math.Max(100, dialog.PrintableAreaWidth);
+            double pageH = Math.Max(100, dialog.PrintableAreaHeight);
+            var slices = PrintLayout.Paginate(image.PixelWidth, image.PixelHeight, pageW, pageH, margin: 36.0);
+            if (slices.Count == 0)
+                return false;
+
+            string title = string.IsNullOrWhiteSpace(jobTitle)
+                ? $"{Brand.Name} {DateTime.Now:yyyy-MM-dd HH:mm}"
+                : jobTitle.Trim();
+
+            var paginator = new BitmapPaginator(image, slices, new Size(pageW, pageH));
+            dialog.PrintDocument(paginator, title);
+            return true;
+        }
+        finally
+        {
+            if (owner.IsVisible)
+            {
+                owner.Dispatcher.BeginInvoke(() =>
+                {
+                    try { owner.Activate(); } catch { /* closed */ }
+                }, DispatcherPriority.Input);
+            }
+        }
+    }
+
+    private sealed class BitmapPaginator : DocumentPaginator
+    {
+        private readonly BitmapSource _source;
+        private readonly IReadOnlyList<PrintPageSlice> _slices;
+        private Size _pageSize;
+
+        public BitmapPaginator(BitmapSource source, IReadOnlyList<PrintPageSlice> slices, Size pageSize)
+        {
+            _source = source;
+            _slices = slices;
+            _pageSize = pageSize;
+        }
+
+        public override bool IsPageCountValid => true;
+        public override int PageCount => _slices.Count;
+        public override Size PageSize { get => _pageSize; set => _pageSize = value; }
+        public override IDocumentPaginatorSource? Source => null;
+
+        public override DocumentPage GetPage(int pageNumber)
+        {
+            var slice = _slices[pageNumber];
+            BitmapSource pageBitmap = slice.SourceY == 0 && slice.SourceHeight == _source.PixelHeight
+                ? _source
+                : new CroppedBitmap(_source, new Int32Rect(0, slice.SourceY, _source.PixelWidth, slice.SourceHeight));
+
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, _pageSize.Width, _pageSize.Height));
+                RenderOptions.SetBitmapScalingMode(visual, BitmapScalingMode.HighQuality);
+                dc.DrawImage(pageBitmap, new Rect(slice.DestX, slice.DestY, slice.DestWidth, slice.DestHeight));
+            }
+            return new DocumentPage(visual, _pageSize, new Rect(_pageSize), new Rect(_pageSize));
         }
     }
 

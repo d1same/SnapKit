@@ -17,13 +17,13 @@ Nothing is saved to disk unless you ask. Captures stay in memory.
 
 Windows 10 or 11, 64-bit.
 
-[SnapKit 0.5.0](https://github.com/d1same/SnapKit/releases/tag/v0.5.0)
+[SnapKit 0.5.1](https://github.com/d1same/SnapKit/releases/tag/v0.5.1)
 
 Download `SnapKit-win-x64.zip` from that release. Unzip it and run `SnapKit.exe` once.
 
 That first run installs SnapKit for the current user. A non-blocking progress window stays responsive while it copies, so the install is never a silent pause. The program is copied to `%LOCALAPPDATA%\Programs\SnapKit\`, a Start menu shortcut is created, and an entry appears in Settings → Apps so it can be uninstalled. The copy you launched from the zip then closes, and the installed copy opens beside the clock. It also starts with Windows. Turn that off in Settings if you do not want it. Running a newer zip shows **Updating SnapKit**, closes whatever SnapKit is already running, and replaces it.
 
-This build is **0.5.0**. After it is running it periodically checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, a badge appears on the tray icon and menu, and an update window shows both versions along with the GitHub release notes. **Update now** streams the download into a versioned temp folder with live `%` and MB progress, then the new copy shows a non-blocking install window while replacing the old one and relaunches with an `--updated` toast and automatic temp cleanup. Both the tray menu and Settings also have **Check for updates…**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
+This build is **0.5.1**. After it is running it periodically checks [d1same/SnapKit](https://github.com/d1same/SnapKit) for a newer GitHub release. If one exists, a badge appears on the tray icon and menu, and an update window shows both versions along with the GitHub release notes. **Update now** streams the download into a versioned temp folder with live `%` and MB progress, then the new copy shows a non-blocking install window while replacing the old one and relaunches with an `--updated` toast and automatic temp cleanup. Both the tray menu and Settings also have **Check for updates…**. A release is published by pushing a `v*` tag. GitHub Actions builds `SnapKit-win-x64.zip` and attaches it to that release. The repository has to be public for that check to see the release, because the app does not ship a GitHub token.
 
 Windows SmartScreen will warn on an unsigned app. Choose **More info**, then **Run anyway**.
 
@@ -89,11 +89,12 @@ The ultra-minimal floating rail keeps all tools on one slim row (icons with subt
 | `Ctrl+C` | Copy the picture and close the shot |
 | `Ctrl+Shift+S` | Quick save PNG directly to your Quick Save folder and close |
 | `Ctrl+S` | Save as PNG or JPG, then close the shot |
+| `Ctrl+P` | Print (fits single page or auto-paginates tall captures & guides; also works with Microsoft Print to PDF) |
 | `Esc` | Discard the edits and close |
 
 Double-click text or a callout to edit it. `Ctrl+Enter` commits the text. `Esc` while typing cancels that edit. Drag the circular handles on any selected arrow, callout, box, circle, blur, redact, spotlight, or magnifier loupe to resize or re-aim endpoints directly. Choose **Clean**, **Dark**, or **Slate** under **Frame** to wrap the export in a rounded documentation backdrop with a soft drop shadow, and toggle **Stamp** to add a subtle timestamp and optional ticket # or hostname proof bar.
 
-**Pin** floats the picture always-on-top with a hover action bar (**Copy**, **Save**, opacity badge, close). Drag to move, scroll wheel to resize, `Ctrl`+scroll wheel to adjust opacity (`20%–100%`), double-click or `Ctrl+C` to copy (with a green `"Copied!"` toast), `Ctrl+Shift+S` to quick save, `Ctrl+S` to save as, `Ctrl+0` to reset, right-click for the context menu, and `Esc` to close.
+**Pin** floats the picture always-on-top with a hover action bar (**Copy**, **Save**, opacity badge, close). Drag to move, scroll wheel to resize, `Ctrl`+scroll wheel to adjust opacity (`20%–100%`), double-click or `Ctrl+C` to copy (with a green `"Copied!"` toast), `Ctrl+Shift+S` to quick save, `Ctrl+S` to save as, `Ctrl+P` to print, `Ctrl+0` to reset, right-click for the context menu, and `Esc` to close.
 
 OCR reads the capture on the PC, then highlights each word on the picture. The highlight sits on the word at 100%, 125%, 150%, and 200% scaling, including a monitor that is not at the top-left of the desktop. Drag across the words you want and that text is copied in reading order, or switch to **Table** mode (`Tab`, auto-selected automatically whenever a multi-column grid is detected) to see vertical column guides and copy tab-separated cells that paste straight into **Excel** or **Google Sheets** with rows and columns intact (`Ctrl+A` copies all, `Ctrl+Shift+C` always copies as a table). `Esc` closes the highlighter and leaves the capture editable. If OCR fails, the message stays in a small window with **Copy error**. OCR uses the Windows language already installed. No cloud.
 

@@ -277,6 +277,24 @@ internal sealed class EditorSession
         return true;
     }
 
+    public bool Print(Window owner)
+    {
+        try
+        {
+            var bitmap = Render();
+            if (!ImageFile.Print(bitmap, owner))
+                return false;
+            State.Recent.Update(Recent, BitmapConvert.ToPixelBuffer(bitmap));
+            Flash("Sent to printer!", copied: true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Flash("Print failed: " + ex.Message);
+            return false;
+        }
+    }
+
     public bool QuickSave()
     {
         try

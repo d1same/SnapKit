@@ -34,6 +34,11 @@ internal static class ShotMenu
             surface.CommitEditing();
             owner.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => session.Save(owner)));
         }, "Ctrl+S"));
+        menu.Items.Add(DarkMenu.Item("Print…", () =>
+        {
+            surface.CommitEditing();
+            owner.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => session.Print(owner)));
+        }, "Ctrl+P"));
 
         // ── Smart Tools ────────────────────────────────────────────────────────
         menu.Items.Add(DarkMenu.Separator());

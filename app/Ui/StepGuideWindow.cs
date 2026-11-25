@@ -83,6 +83,10 @@ internal sealed class StepGuideWindow : Window
         savePngBtn.Margin = new Thickness(0, 0, 6, 0);
 
         var saveHtmlBtn = UiChrome.ActionButton("Save HTML…", SaveHtml, ButtonTone.Secondary, minWidth: 92);
+        saveHtmlBtn.Margin = new Thickness(0, 0, 6, 0);
+
+        var printBtn = UiChrome.ActionButton("Print…", PrintGuide, ButtonTone.Secondary, minWidth: 74);
+        printBtn.ToolTip = "Print guide or save via Microsoft Print to PDF  (Ctrl+P)";
 
         var topGrid = new Grid();
         topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -96,7 +100,7 @@ internal sealed class StepGuideWindow : Window
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(12, 0, 0, 0),
-            Children = { copyImgBtn, copyHtmlBtn, savePngBtn, saveHtmlBtn }
+            Children = { copyImgBtn, copyHtmlBtn, savePngBtn, saveHtmlBtn, printBtn }
         };
         Grid.SetColumn(actions, 2);
         topGrid.Children.Add(_titleBox);
@@ -156,6 +160,11 @@ internal sealed class StepGuideWindow : Window
             if (e.Key == Key.Escape && Keyboard.FocusedElement is not TextBox)
             {
                 Close();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.P && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                PrintGuide();
                 e.Handled = true;
             }
         };
@@ -605,6 +614,27 @@ internal sealed class StepGuideWindow : Window
         {
             _status.Foreground = Palette.Warning;
             _status.Text = "Save failed: " + ex.Message;
+        }
+    }
+
+    private void PrintGuide()
+    {
+        if (_steps.Count == 0)
+            return;
+        try
+        {
+            var img = RenderCombinedVerticalImage();
+            string title = string.IsNullOrWhiteSpace(_titleBox.Text) ? $"{Brand.Name} Guide" : _titleBox.Text.Trim();
+            if (ImageFile.Print(img, this, title))
+            {
+                _status.Foreground = Palette.Copied;
+                _status.Text = "Sent guide to printer!";
+            }
+        }
+        catch (Exception ex)
+        {
+            _status.Foreground = Palette.Warning;
+            _status.Text = "Print failed: " + ex.Message;
         }
     }
 }

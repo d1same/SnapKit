@@ -199,6 +199,11 @@ internal sealed class PinnedWindow : Window
                 SaveAs();
                 e.Handled = true;
             }
+            else if (mods == ModifierKeys.Control && e.Key == Key.P)
+            {
+                PrintShot();
+                e.Handled = true;
+            }
             else if (mods == ModifierKeys.Control && e.Key is Key.D0 or Key.NumPad0)
             {
                 ResetView();
@@ -212,6 +217,7 @@ internal sealed class PinnedWindow : Window
         menu.Items.Add(DarkMenu.Item("Copy image", TryCopy, "Ctrl+C"));
         menu.Items.Add(DarkMenu.Item("Quick Save", QuickSave, "Ctrl+Shift+S"));
         menu.Items.Add(DarkMenu.Item("Save as…", SaveAs, "Ctrl+S"));
+        menu.Items.Add(DarkMenu.Item("Print…", PrintShot, "Ctrl+P"));
         menu.Items.Add(DarkMenu.Separator());
         menu.Items.Add(DarkMenu.SectionHeader("Window"));
         var opacityMenu = DarkMenu.Submenu("Opacity");
@@ -310,6 +316,22 @@ internal sealed class PinnedWindow : Window
         {
             if (ImageFile.Save(_image, this))
                 ShowToast("Saved");
+        }));
+    }
+
+    private void PrintShot()
+    {
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            try
+            {
+                if (ImageFile.Print(_image, this))
+                    ShowToast("Printed!", copied: true);
+            }
+            catch
+            {
+                ShowToast("Print failed");
+            }
         }));
     }
 
